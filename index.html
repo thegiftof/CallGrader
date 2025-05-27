@@ -1,0 +1,1645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Call Training Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=wu8YW5tt"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.2s ease;
+        }
+        .verbatim {
+            font-weight: bold; color: #B91C1C; margin-top: 0.5rem; margin-bottom: 0.5rem;
+            display: block; padding: 0.5rem; background-color: #FEF2F2;
+            border-left: 4px solid #B91C1C; border-radius: 0.25rem;
+        }
+        .agent-line::before {
+            content: "Agent: "; font-weight: bold; color: #1D4ED8;
+        }
+        body.lang-es .agent-line::before { content: "Agente: "; }
+        .note {
+            font-style: italic; color: #555; margin-left: 1rem;
+            margin-top: 0.25rem; margin-bottom: 0.25rem; display: block;
+        }
+        .workflow-note {
+            font-style: italic; color: #1E40AF; font-weight: bold; margin-left: 1rem;
+            margin-top: 0.25rem; margin-bottom: 0.25rem; display: block;
+        }
+        .yellow-highlight-note {
+            background-color: #fefce8; color: #a16207; padding: 0.1rem 0.3rem;
+            border-radius: 0.2rem; font-style: italic; display: inline;
+        }
+        .timer-normal { color: #16A34A; } .timer-warning { color: #FACC15; }
+        .timer-over { color: #DC2626; }
+        .timer-section-title { font-size: 0.8rem; color: #6B7280; }
+
+        #script-content-area { 
+            display: flex;
+            flex-direction: row;
+            gap: 1rem; 
+            margin-bottom: 0.5rem; 
+            min-height: 250px; 
+        }
+
+        #script-content {
+            flex-grow: 1; 
+            width: 66.66%; 
+            max-height: calc(100vh - 460px); 
+            overflow-y: auto;
+            border: 1px solid #e5e7eb; border-radius: 0.375rem; padding:1rem; background-color: white;
+        }
+        #interaction-panel { 
+            width: 33.33%; 
+            padding: 1rem;
+            border: 1px solid #C7D2FE; 
+            border-radius: 0.375rem;
+            background-color: #EEF2FF; 
+            max-height: calc(100vh - 460px); 
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        #interaction-panel h4 {
+            font-size: 1rem; 
+            font-weight: 600; 
+            color: #4338CA; 
+            margin-bottom: 0.5rem;
+            flex-shrink: 0;
+        }
+        #ai-client-response-display { 
+            flex-grow: 1;
+            background-color: #ffffff;
+            border: 1px solid #D1D5DB;
+            border-radius: 0.375rem;
+            padding: 0.75rem;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            overflow-y: auto;
+            margin-bottom: 0.5rem;
+        }
+         #conversation-log-display {
+            font-size: 0.75rem;
+            color: #4B5563; 
+            border-top: 1px dashed #C7D2FE; 
+            padding-top: 0.5rem;
+            margin-top:0.5rem;
+            max-height: 100px; 
+            overflow-y: auto;
+        }
+        .conversation-log-agent { color: #1D4ED8; font-weight:500; }
+        .conversation-log-client { color: #9333EA; font-weight:500;}
+
+
+        #script-content h3 {
+            font-weight: 600; font-size: 1.125rem; margin-bottom: 0.5rem; text-align: center;
+            color: #374151; margin-top: 1rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem;
+        }
+        .lookup-header { 
+            border-bottom: none !important; padding-bottom: 0 !important;
+            margin-bottom: 0.25rem !important; display: inline-block; 
+        }
+        #script-content ul, #script-content ol {
+            list-style-position: inside; margin-left: 1rem; margin-bottom: 1rem;
+        }
+        #script-content ul { list-style-type: disc; }
+        #script-content ol { list-style-type: decimal; }
+        #script-content li { margin-bottom: 0.5rem; }
+        #script-content p { margin-bottom: 0.75rem; }
+
+        .highlight-box {
+            margin-top: 1rem; padding: 0.75rem; border-width: 1px; border-radius: 0.375rem;
+        }
+        .highlight-box-yellow { background-color: #FEFCE8; border-color: #FEF08A; }
+        .highlight-box-yellow .highlight-title { font-weight: 600; color: #854D0E; }
+        .highlight-box-blue { background-color: #EFF6FF; border-color: #BFDBFE; }
+        .highlight-box-blue .highlight-title { font-weight: 600; color: #1E40AF; }
+        .highlight-box-green { background-color: #F0FDF4; border-color: #BBF7D0; }
+        .highlight-box-green .highlight-title { font-weight: 600; color: #166534; }
+        .highlight-box-purple {
+            background-color: #FAF5FF; border-color: #E9D5FF;
+            box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px 0 rgba(0,0,0,0.06);
+        }
+        .highlight-box-purple .highlight-title {
+            font-weight: 600; font-size: 1.125rem; margin-bottom: 0.5rem;
+            text-align: center; color: #6B21A8;
+        }
+
+        @keyframes flashRedSiren {
+            0%, 100% { background-color: #DC2626; }
+            50% { background-color: #B91C1C; }
+        }
+        .flash-red-bg { animation: flashRedSiren 0.4s infinite; }
+        
+        @keyframes flash-highlight-animation {
+            0%, 100% { background-color: yellow; color: black; }
+            50% { background-color: transparent; color: inherit; }
+        }
+        .flash-highlight {
+            animation: flash-highlight-animation 0.7s 3; 
+            padding: 0.1em 0; margin: -0.1em 0; 
+            border-radius: 0.2em;
+        }
+
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0,0,0,0.6); display: flex;
+            align-items: center; justify-content: center; z-index: 1000; padding: 1rem;
+        }
+        .modal-content { 
+            background-color: white; padding: 1.5rem; border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+            width: 90%; max-height: 85vh; position: relative;
+            display: flex; flex-direction: column;
+        }
+        .modal-content-script, .modal-content-grading { 
+            max-width: 700px; overflow-y: auto;
+        }
+        .modal-close-btn {
+            position: absolute; top: 0.75rem; right: 0.75rem; background: none; border: none;
+            font-size: 1.5rem; line-height: 1; color: #6B7280; cursor: pointer; z-index: 10;
+        }
+        .modal-close-btn:hover { color: #1F2937; }
+        .modal-title {
+            font-size: 1.25rem; font-weight: bold; color: #1F2937;
+            margin-bottom: 1rem; text-align: center; flex-shrink: 0;
+        }
+        .sep-button-container, .lookup-button-container {
+            display: flex; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; 
+        }
+        .lookup-button-container { align-items: center; gap: 0.25rem; }
+
+        .lookup-button { 
+            background-color: #3B82F6; color: white; font-weight: bold;
+            padding: 0.25rem 0.75rem; font-size: 0.875rem; border-radius: 0.375rem;
+            transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .lookup-button:hover { background-color: #2563EB; }
+         .lookup-button.uhc { background-color: #0EA5E9; } .lookup-button.uhc:hover { background-color: #0284C7; }
+        .lookup-button.aetna { background-color: #EF4444; } .lookup-button.aetna:hover { background-color: #DC2626; }
+        .lookup-button.humana { background-color: #F59E0B; } .lookup-button.humana:hover { background-color: #D97706; }
+        .lookup-button.careplus { background-color: #10B981; } .lookup-button.careplus:hover { background-color: #059669; }
+        .lookup-button.wellcare { background-color: #8B5CF6; } .lookup-button.wellcare:hover { background-color: #7C3AED; }
+        .lookup-button.marx { background-color: #64748B; } .lookup-button.marx:hover { background-color: #475569; }
+        .lookup-button.spap { background-color: #EC4899; } .lookup-button.spap:hover { background-color: #DB2777; }
+        .lookup-button.sales-form { background-color: #22C55E; } .lookup-button.sales-form:hover { background-color: #16A34A; }
+
+
+        .occi-example-item { margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #eee;}
+        .occi-example-item:last-child { border-bottom: none; }
+        .occi-example-item h4 { font-weight: bold; color: #374151; margin-bottom: 0.25rem; }
+        .occi-example-item p { font-size: 0.9rem; margin-left: 0.5rem; }
+
+        #persistent-notes-container {
+            position: fixed; top: 70px; right: 20px; width: 280px; 
+            background-color: #f9fafb; border: 1px solid #e5e7eb;
+            border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+            padding: 1rem; z-index: 1001; transition: height 0.3s ease-in-out; 
+        }
+        .notes-header { 
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 0.75rem; border-bottom: 1px solid #d1d5db; padding-bottom: 0.5rem;
+        }
+        .notes-header h3 {
+            font-size: 1rem; font-weight: 600; color: #374151;
+            margin-bottom: 0; border-bottom: none; padding-bottom: 0; text-align: left;
+        }
+        #minimize-notes-btn {
+            background-color: #6b7280; color: white; border: none;
+            padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 0.25rem; cursor: pointer;
+        }
+        #minimize-notes-btn:hover { background-color: #4b5563; }
+        #session-notes-textarea {
+            width: 100%; height: 100px; 
+            border: 1px solid #d1d5db; border-radius: 0.375rem;
+            padding: 0.5rem; font-size: 0.875rem; resize: vertical; 
+            transition: opacity 0.3s ease-in-out, height 0.3s ease-in-out; 
+        }
+        #full-call-transcript-display { height: 60px; } 
+
+        #persistent-notes-container.minimized #session-notes-textarea,
+        #persistent-notes-container.minimized #full-call-transcript-display,
+        #persistent-notes-container.minimized label[for="full-call-transcript-display"],
+        #persistent-notes-container.minimized label[for="session-notes-textarea"] { 
+            height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; 
+            border-width: 0; margin-top: 0; display:none; 
+        }
+         #persistent-notes-container.minimized { height: auto; }
+         #language-toggle-btn {
+             position: fixed; top: 20px; left: 20px; z-index: 1002;
+         }
+
+        #ai-controls {
+            background-color: #E0E7FF; border: 1px solid #C7D2FE;
+            border-radius: 0.375rem; padding: 1rem; margin-top: 1rem; margin-bottom: 1rem;
+        }
+        #ai-controls h3 {
+            font-size: 1.125rem; font-weight: 600; color: #3730A3;
+            margin-bottom: 0.75rem; text-align: center;
+        }
+        #listening-status {
+            font-style: italic; color: #4F46E5; text-align: center;
+            margin-bottom: 0.5rem; min-height: 1.5em;
+        }
+        #transcribed-text-display { 
+            background-color: #ffffff; border: 1px solid #D1D5DB;
+            border-radius: 0.375rem; padding: 0.75rem; margin-top: 0.5rem;
+            min-height: 60px; font-size: 0.875rem; line-height: 1.25rem;
+        }
+        /* Call Grading Modal Styles - mostly unchanged */
+        .grading-criteria-item { margin-bottom: 0.75rem; padding-bottom: 0.75rem; border-bottom: 1px solid #e5e7eb; }
+        .grading-criteria-item:last-child { border-bottom: none; margin-bottom: 0; }
+        .grading-criteria-item .criterion-text { display: block; font-weight: 500; color: #374151; margin-bottom: 0.25rem; }
+        .grading-criteria-item .ai-score { font-weight: bold; color: #1D4ED8; }
+        .grading-criteria-item .ai-comment { font-style: italic; color: #555; font-size: 0.8rem; margin-top: 0.1rem; }
+        #grade-results-display { margin-top: 1rem; padding: 1rem; background-color: #F3F4F6; border-radius: 0.375rem; }
+        #grade-results-display h4 { font-size: 1.125rem; font-weight: 600; color: #1F2937; margin-bottom: 0.5rem; }
+        #grade-results-display p { margin-bottom: 0.25rem; }
+        #grade-results-display .pass { color: #059669; font-weight: bold; }
+        #grade-results-display .fail { color: #B91C1C; font-weight: bold; }
+        #ai-grading-status { text-align: center; font-style: italic; padding: 1rem; color: #4F46E5; }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 md:p-8 flex flex-col min-h-screen font-inter">
+
+    <button id="language-toggle-btn" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg">
+        Switch to Spanish
+    </button>
+
+    <div class="bg-white rounded-lg shadow-xl p-6 flex-grow flex flex-col max-w-5xl mx-auto w-full"> 
+        <h1 id="main-title" class="text-2xl md:text-3xl font-bold text-center text-gray-800 mb-6">AI Call Training Tool</h1>
+
+        <div class="flex flex-col sm:flex-row justify-around items-center bg-gray-200 p-3 rounded-md mb-6 text-center space-y-3 sm:space-y-0">
+            <div class="w-full sm:w-1/3">
+                <span id="section-time-label" class="timer-section-title block">Section Time</span>
+                <div id="section-timer" class="text-xl font-bold timer-normal">00:00</div>
+                <div id="section-target-time" class="text-xs text-gray-500">Target: 0 min</div>
+            </div>
+            <div class="w-full sm:w-1/3 border-l border-r border-gray-300 px-2 my-2 sm:my-0">
+                <span id="current-section-label" class="timer-section-title block">Current Section</span>
+                <div id="section-title" class="text-xl font-bold text-gray-700 truncate">INTRO</div>
+            </div>
+            <div class="w-full sm:w-1/3">
+                <span id="total-call-time-label" class="timer-section-title block">Total Call Time</span>
+                <div id="total-timer" class="text-xl font-bold text-gray-700">00:00</div>
+            </div>
+        </div>
+
+        <div id="script-content-area">
+            <div id="script-content">
+                </div>
+            <div id="interaction-panel">
+                <h4 id="ai-client-panel-title">AI Client Response</h4>
+                <div id="ai-client-response-display">Client is waiting...</div>
+                 <h4 class="mt-2 text-xs text-gray-600">Conversation Log:</h4>
+                <div id="conversation-log-display"></div>
+            </div>
+        </div>
+
+        <div id="ai-controls">
+            <h3>AI Training Assistant</h3>
+            <button id="toggle-listening-btn" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg mb-2 transition-colors duration-150">
+                Start Simulation
+            </button>
+            <div id="listening-status">Not Listening</div>
+            <div>
+                <label for="transcribed-text-display" class="block text-sm font-medium text-gray-700">You Said:</label>
+                <div id="transcribed-text-display" class="mt-1">Waiting for your response...</div>
+            </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row justify-between items-center pt-4 border-t mt-4 space-y-2 sm:space-y-0">
+            <button id="prev-btn" class="w-full sm:w-auto bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg disabled:opacity-50">
+                Previous
+            </button>
+            <button id="start-over-btn" class="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">
+                Start Over
+            </button>
+            <button id="next-btn" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg disabled:opacity-50">
+                Next
+            </button>
+        </div>
+    </div>
+
+    <div id="persistent-notes-container">
+        <div class="notes-header">
+            <h3 id="session-notes-title">Session Notes</h3>
+            <button id="minimize-notes-btn">Minimize</button>
+        </div>
+        <textarea id="session-notes-textarea" placeholder="Type your notes here..."></textarea>
+        <div class="mt-2">
+             <label for="full-call-transcript-display" class="block text-sm font-medium text-gray-700">Full Call Transcript (for AI Grading):</label>
+             <textarea id="full-call-transcript-display" readonly class="mt-1 w-full h-20 p-2 border border-gray-300 rounded-md bg-gray-50 text-xs"></textarea>
+        </div>
+    </div>
+
+    <div id="hip-modal" class="modal-overlay hidden"> 
+        <div class="modal-content modal-content-script">
+            <button id="hip-modal-close-btn" class="modal-close-btn">&times;</button>
+            <h2 id="hip-modal-title" class="modal-title"></h2>
+            <div id="hip-modal-body"></div>
+        </div>
+    </div>
+    <div id="occi-examples-modal" class="modal-overlay hidden"> 
+        <div class="modal-content modal-content-script">
+            <button id="occi-examples-modal-close-btn" class="modal-close-btn">&times;</button>
+            <h2 id="occi-examples-modal-title" class="modal-title">OCCI Method Examples</h2>
+            <div id="occi-examples-modal-body"></div>
+        </div>
+    </div>
+    <div id="call-grading-modal" class="modal-overlay hidden"> 
+         <div class="modal-content modal-content-grading">
+            <button id="call-grading-modal-close-btn" class="modal-close-btn">&times;</button>
+            <h2 id="call-grading-modal-title" class="modal-title">AI Call Scorecard</h2>
+            <div id="call-grading-modal-body" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="evaluator-name" class="block text-sm font-medium text-gray-700">Evaluator Name:</label>
+                        <input type="text" id="evaluator-name" name="evaluator-name" class="mt-1" value="AI Assistant" readonly>
+                    </div>
+                    <div>
+                        <label for="agent-name-grade" class="block text-sm font-medium text-gray-700">Agent Name:</label>
+                        <input type="text" id="agent-name-grade" name="agent-name-grade" class="mt-1" placeholder="Enter Agent Name">
+                    </div>
+                    <div>
+                        <label for="evaluation-date" class="block text-sm font-medium text-gray-700">Date:</label>
+                        <input type="date" id="evaluation-date" name="evaluation-date" class="mt-1">
+                    </div>
+                </div>
+                <hr/>
+                <div id="ai-grading-status" class="hidden">AI Grading in progress...</div>
+                <div id="grading-criteria-display-container" class="space-y-3">
+                </div>
+                <hr/>
+                <div id="grade-results-display" class="hidden">
+                    <h4>Call Grade Summary</h4>
+                    <p><strong>Total Score:</strong> <span id="total-score-display"></span> / 100</p>
+                    <p><strong>Percentage:</strong> <span id="percentage-display"></span>%</p>
+                    <p><strong>Status:</strong> <span id="pass-fail-status-display"></span></p>
+                    <p><strong>Overall Grade:</strong> <span id="overall-grade-display"></span></p>
+                </div>
+                <div class="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 mt-4">
+                    <button id="download-grade-pdf-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg disabled:opacity-50" disabled>
+                        Download PDF Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        const langStrings = {
+            en: {
+                mainTitle: "AI Call Training Tool", 
+                sectionTimeLabel: "Section Time", currentSectionLabel: "Current Section", totalCallTimeLabel: "Total Call Time",
+                prevBtn: "Previous", nextBtn: "Next", startOverBtn: "Start Over",
+                sessionNotesTitle: "Session Notes", minimizeNotesBtn: "Minimize", maximizeNotesBtn: "Maximize",
+                switchToSpanishBtn: "Switch to Spanish", switchToEnglishBtn: "Switch to English",
+                hipModalTitle: "PITCH HOSPITAL INDEMNITY", occiModalTitle: "OCCI Method Examples",
+                notMedicareEligibleBtn: "Not Medicare Eligible - Pitch HIP", marxPortalBtn: "MARx Portal", occiExamplesBtn: "OCCI EXAMPLES",
+                uhcProviderBtn: "UHC", aetnaProviderBtn: "AETNA", humanaProviderBtn: "HUMANA", careplusProviderBtn: "CAREPLUS", wellcareProviderBtn: "WELLCARE",
+                uhcRxBtn: "UHC Rx", aetnaRxBtn: "AETNA Rx", humanaRxBtn: "HUMANA Rx", careplusRxBtn: "CAREPLUS Rx", wellcareRxBtn: "WELLCARE Rx",
+                sepIdentifiedBtn: "SEP Identified - Show Benefits", sepFinderBtn: "SEP Finder", spapFinderBtn: "SPAP Finder", noSepIdentifiedBtn: "Still No SEP - Pitch HIP",
+                mapdSalesFormBtn: "MAPD SALES FORM", ancillarySalesFormBtn: "ANCILLARY SALES FORM",
+                agentLinePrefix: "Agent: ",
+                startListeningBtn: "Start Simulation", stopListeningBtn: "Stop Simulation", 
+                listeningStatusListening: "Agent Speaking...", listeningStatusNotListening: "Simulation Stopped",
+                listeningStatusAwaitingClient: "AI Client Thinking...", 
+                listeningStatusError: "Mic Error. Check Permissions.", listeningStatusPermissionDenied: "Mic permission denied. Please enable in browser settings.",
+                transcribedTextWaiting: "Waiting for your response...",
+                aiClientResponseWaiting: "Client is waiting...", 
+                aiClientResponseLoading: "Client is thinking...", 
+                aiClientResponseError: "Client Error. Could not get response.", 
+                endCallGradeBtn: "End Call & AI Grade", 
+                callGradingModalTitle: "AI Call Scorecard", 
+                downloadPDFBtn: "Download PDF Report",
+                evaluatorNameLabel: "Evaluator Name:", agentNameLabel: "Agent Name:", dateLabel: "Date:",
+                totalScoreLabel: "Total Score:", percentageLabel: "Percentage:", statusLabel: "Status:", overallGradeLabel: "Overall Grade:",
+                passStatus: "PASS", failStatus: "FAIL",
+                aiGradingInProgress: "AI Grading in progress, please wait...",
+                aiGradingError: "AI Grading Error. Could not get scores.",
+                aiClientPanelTitle: "AI Client Response",
+                conversationLogTitle: "Conversation Log (Last 5 Turns):"
+            },
+            es: { 
+                mainTitle: "Herramienta de Entrenamiento de Llamadas con IA", 
+                sectionTimeLabel: "Tiempo de Sección", currentSectionLabel: "Sección Actual", totalCallTimeLabel: "Tiempo Total de Llamada",
+                prevBtn: "Anterior", nextBtn: "Siguiente", startOverBtn: "Empezar de Nuevo",
+                sessionNotesTitle: "Notas de Sesión", minimizeNotesBtn: "Minimizar", maximizeNotesBtn: "Maximizar",
+                switchToSpanishBtn: "Cambiar a Español", switchToEnglishBtn: "Cambiar a Inglés",
+                hipModalTitle: "PRESENTAR INDEMNIZACIÓN HOSPITALARIA", occiModalTitle: "Ejemplos del Método OCCI",
+                notMedicareEligibleBtn: "No Elegible para Medicare - Presentar HIP", marxPortalBtn: "Portal MARx", occiExamplesBtn: "EJEMPLOS OCCI",
+                uhcProviderBtn: "UHC", aetnaProviderBtn: "AETNA", humanaProviderBtn: "HUMANA", careplusProviderBtn: "CAREPLUS", wellcareProviderBtn: "WELLCARE",
+                uhcRxBtn: "UHC Rx", aetnaRxBtn: "AETNA Rx", humanaRxBtn: "HUMANA Rx", careplusRxBtn: "CAREPLUS Rx", wellcareRxBtn: "WELLCARE Rx",
+                sepIdentifiedBtn: "SEP Identificado - Mostrar Beneficios", sepFinderBtn: "Buscador SEP", spapFinderBtn: "Buscador SPAP", noSepIdentifiedBtn: "Aún Sin SEP - Presentar HIP",
+                mapdSalesFormBtn: "FORMULARIO DE VENTA MAPD", ancillarySalesFormBtn: "FORMULARIO DE VENTA AUXILIAR",
+                agentLinePrefix: "Agente: ",
+                startListeningBtn: "Iniciar Simulación", stopListeningBtn: "Detener Simulación",
+                listeningStatusListening: "Agente Hablando...", listeningStatusNotListening: "Simulación Detenida",
+                listeningStatusAwaitingClient: "Cliente IA Pensando...",
+                transcribedTextWaiting: "Esperando su respuesta...",
+                aiClientResponseWaiting: "Cliente está esperando...",
+                aiClientResponseLoading: "Cliente está pensando...",
+                aiClientResponseError: "Error del Cliente. No se pudo obtener respuesta.",
+                endCallGradeBtn: "Finalizar Llamada y Calificar con IA", 
+                callGradingModalTitle: "Tarjeta de Puntuación de Llamada por IA",
+                downloadPDFBtn: "Descargar Informe PDF",
+                evaluatorNameLabel: "Nombre del Evaluador:", agentNameLabel: "Nombre del Agente:", dateLabel: "Fecha:",
+                totalScoreLabel: "Puntuación Total:", percentageLabel: "Porcentaje:", statusLabel: "Estado:", overallGradeLabel: "Calificación General:",
+                passStatus: "APROBADO", failStatus: "FALLIDO",
+                aiGradingInProgress: "Calificación por IA en progreso, por favor espere...",
+                aiGradingError: "Error de Calificación por IA. No se pudieron obtener las puntuaciones.",
+                aiClientPanelTitle: "Respuesta del Cliente IA",
+                conversationLogTitle: "Registro de Conversación (Últimas 5 Intervenciones):"
+            }
+        };
+        
+        const scorecardCriteria = [
+            "Did the agent start the call with branding? Name, Company, and licensed agent?",
+            "Did the agent push through the rebuttal, \"Am I going to have to change my plan\" well and compliantly?",
+            "Did the agent read the SOA verbatim and get an affirmative YES or NO?",
+            "How would you rate the agent's Needs Analysis and Discovery?",
+            "The agent had great tonality?",
+            "How did the agent respond when advised the client can't remember their doctor?",
+            "How well did the agent present the plan benefits?",
+            "Did the agent rebuttal, \"I'll have to talk to my son about this\" well?",
+            "Did the agent read the closing verbatim?",
+            "How well did the agent use the enrollment tools, Provider Search, and Formulary Search?"
+        ];
+
+        const hospitalIndemnityPitchHTML = { 
+            en: `<div class="highlight-box highlight-box-purple"><h3 class="highlight-title">Hospital Indemnity Pitch</h3><p class="note"><span class="yellow-highlight-note">Pitch Hospital Indemnity on ALL Standard and CSNP plans.</span></p><p class="agent-line">"Now as we discussed earlier you will have a copay if you have a hospital stay at some point while enrolled in this plan. I do have some options available that can protect you from racking up a large bill called Hospital Indemnity plans. Basically, in exchange for a low premium you can get a cash benefit paid directly to you for each day you spend in the hospital and can use that money for anything you need without restrictions. I'm going to compare some options with you because you might really benefit from this, not to mention the peace of mind it would bring you. Please grab your pen and paper one more time."</p><p class="note"><span class="yellow-highlight-note">Match their daily hospitalization benefit and MOOP if possible. If the cost is too high let them know you can look at lower options to help them find comfortable piece of mind.</span></p><p class="note"><span class="yellow-highlight-note">AFTER THE SALE JUMP BACK TO FINISH THE ADVANTAGE PLAN SCRIPTING</span></p><p class="note">(Complete HIP enrollment if applicable)</p></div>`,
+            es: `<div class="highlight-box highlight-box-purple"><h3 class="highlight-title">Argumentario de Indemnización Hospitalaria</h3><p class="note"><span class="yellow-highlight-note">Presentar Indemnización Hospitalaria en TODOS los planes Estándar y CSNP.</span></p><p class="agent-line">"Como comentamos anteriormente, tendrá un copago si es hospitalizado en algún momento mientras esté inscrito en este plan. Tengo algunas opciones disponibles que pueden protegerlo de acumular una factura grande, llamadas planes de Indemnización Hospitalaria. Básicamente, a cambio de una prima baja, puede obtener un beneficio en efectivo que se le paga directamente por cada día que pase en el hospital y puede usar ese dinero para lo que necesite sin restricciones. Voy a comparar algunas opciones con usted porque realmente podría beneficiarse de esto, sin mencionar la tranquilidad que le brindaría. Por favor, tome lápiz y papel una vez más."</p><p class="note"><span class="yellow-highlight-note">Iguale su beneficio diario de hospitalización y MOOP si es posible. Si el costo es demasiado alto, hágales saber que puede buscar opciones más bajas para ayudarles a encontrar tranquilidad.</span></p><p class="note"><span class="yellow-highlight-note">DESPUÉS DE LA VENTA, VUELVA PARA TERMINAR EL SCRIPT DEL PLAN ADVANTAGE</span></p><p class="note">(Completar la inscripción de HIP si aplica)</p></div>`
+        };
+
+        const occiExamplesHTML = { 
+            en: `
+                <div class="occi-example-item">
+                    <h4>Food Card</h4>
+                    <p><strong>Open-ended:</strong> What stood out to you about the food card you heard about?</p>
+                    <p><strong>Closed-ended:</strong> Would help with groceries really make a difference for you?</p>
+                    <p><strong>Clarifying:</strong> So, saving on groceries would help your monthly budget, correct?</p>
+                    <p><strong>Impact:</strong> Getting a benefit like that could really free up your income for other things. That's something we'll definitely keep in mind-sound good?</p>
+                </div>
+                <div class="occi-example-item"><h4>Dental</h4><p><strong>Open ended:</strong> "Tell me about the last time you went to the dentist."</p><p><strong>Close ended:</strong> "How much did that cost?"</p><p><strong>Clarifying Statement:</strong> "So it sounds like your biggest concern is the cost of care, correct?"</p><p><strong>Impact:</strong> "A plan that covers those services could save you hundreds annually-and I want to make sure you're getting the most value possible. That's sound great, right?"</p></div>
+                <div class="occi-example-item"><h4>Vision</h4><p><strong>Open-ended:</strong> When was the last time you went to see an eye doctor?</p><p><strong>Closed-ended:</strong> Did you have to pay out-of-pocket for glasses?</p><p><strong>Clarifying:</strong> So regular access to vision support is important to you, correct?</p><p><strong>Impact:</strong> A plan that helps cover those costs can make a big difference, especially long term. That's what you're hoping to find, right?</p></div>
+                <div class="occi-example-item"><h4>Hearing</h4><p><strong>Open-ended:</strong> When was your last hearing exam?</p><p><strong>Closed-ended:</strong> Did you have to pay out-of-pocket for your services?</p><p><strong>Clarifying:</strong> So regular access to hearing support is important to you, correct?</p><p><strong>Impact:</strong> A plan that helps cover those costs can make a big difference, especially long term. That's what you're hoping to find, right?</p></div>
+                <div class="occi-example-item"><h4>Transportation</h4><p><strong>Open-ended:</strong> Tell me about the last time you had to get to a doctor's appointment-how did you get there?</p><p><strong>Closed-ended:</strong> Do you currently have access to reliable transportation?</p><p><strong>Clarifying:</strong> So, getting a ride to medical appointments is something you'd really benefit from, right?</p><p><strong>Impact:</strong> A plan that offers transportation can take a big weight off your shoulders. That would help, wouldn't it?</p></div>
+                <div class="occi-example-item"><h4>OTC Card</h4><p><strong>Open-ended:</strong> What kind of over-the-counter items do you find yourself buying regularly?</p><p><strong>Closed-ended:</strong> Do you usually pay out of pocket for things like vitamins or cold medicine?</p><p><strong>Clarifying:</strong> So, having help with those costs would make things easier month to month, right?</p><p><strong>Impact:</strong> An OTC card can help you save on those everyday essentials-definitely something worth exploring, right?</p></div>
+            `,
+            es: `
+                <div class="occi-example-item">
+                    <h4>Tarjeta de Alimentos</h4>
+                    <p><strong>Pregunta abierta:</strong> ¿Qué le llamó la atención de la tarjeta de alimentos de la que oyó hablar?</p>
+                    <p><strong>Pregunta cerrada:</strong> ¿Le ayudaría realmente con la compra de comestibles?</p>
+                    <p><strong>Aclaración:</strong> Entonces, ahorrar en comestibles ayudaría a su presupuesto mensual, ¿correcto?</p>
+                    <p><strong>Impacto:</strong> Obtener un beneficio como ese podría liberar realmente sus ingresos para otras cosas. Eso es algo que definitivamente tendremos en cuenta, ¿le parece bien?</p>
+                </div>
+                <div class="occi-example-item"><h4>Dental</h4><p><strong>Pregunta abierta:</strong> "Cuénteme sobre la última vez que fue al dentista."</p><p><strong>Pregunta cerrada:</strong> "¿Cuánto costó eso?"</p><p><strong>Declaración aclaratoria:</strong> "Entonces, parece que su mayor preocupación es el costo de la atención, ¿correcto?"</p><p><strong>Impacto:</strong> "Un plan que cubra esos servicios podría ahorrarle cientos anualmente, y quiero asegurarme de que obtenga el mayor valor posible. ¿Suena genial, verdad?"</p></div>
+                <div class="occi-example-item"><h4>Visión</h4><p><strong>Pregunta abierta:</strong> ¿Cuándo fue la última vez que fue al oculista?</p><p><strong>Pregunta cerrada:</strong> ¿Tuvo que pagar de su bolsillo las gafas?</p><p><strong>Aclaración:</strong> Entonces, el acceso regular al apoyo visual es importante para usted, ¿correcto?</p><p><strong>Impacto:</strong> Un plan que ayude a cubrir esos costos puede marcar una gran diferencia, especialmente a largo plazo. Eso es lo que espera encontrar, ¿verdad?</p></div>
+                <div class="occi-example-item"><h4>Audición</h4><p><strong>Pregunta abierta:</strong> ¿Cuándo fue su último examen de audición?</p><p><strong>Pregunta cerrada:</strong> ¿Tuvo que pagar de su bolsillo por sus servicios?</p><p><strong>Aclaración:</strong> Entonces, el acceso regular al apoyo auditivo es importante para usted, ¿correcto?</p><p><strong>Impacto:</strong> Un plan que ayude a cubrir esos costos puede marcar una gran diferencia, especialmente a largo plazo. Eso es lo que espera encontrar, ¿verdad?</p></div>
+                <div class="occi-example-item"><h4>Transporte</h4><p><strong>Pregunta abierta:</strong> Cuénteme sobre la última vez que tuvo que ir a una cita médica, ¿cómo llegó allí?</p><p><strong>Pregunta cerrada:</strong> ¿Actualmente tiene acceso a transporte confiable?</p><p><strong>Aclaración:</strong> Entonces, conseguir transporte para las citas médicas es algo de lo que realmente se beneficiaría, ¿verdad?</p><p><strong>Impacto:</strong> Un plan que ofrezca transporte puede quitarle un gran peso de encima. Eso ayudaría, ¿no cree?</p></div>
+                <div class="occi-example-item"><h4>Tarjeta OTC</h4><p><strong>Pregunta abierta:</strong> ¿Qué tipo de artículos de venta libre compra regularmente?</p><p><strong>Pregunta cerrada:</strong> ¿Suele pagar de su bolsillo cosas como vitaminas o medicamentos para el resfriado?</p><p><strong>Aclaración:</strong> Entonces, tener ayuda con esos costos facilitaría las cosas mes a mes, ¿verdad?</p><p><strong>Impacto:</strong> Una tarjeta OTC puede ayudarle a ahorrar en esos elementos esenciales de todos los días, definitivamente algo que vale la pena explorar, ¿verdad?</p></div>
+            `
+        };
+        
+        const scriptSections = [
+            {
+                title: { en: "INTRO", es: "INTRODUCCIÓN" },
+                durationMinutes: 3,
+                content: {
+                    en: `<h3>Introduction</h3><p class="agent-line">Hi, this is [Your Full Name], a licensed insurance agent with Clearview on a recorded line. I hope you are having a great day! <span class="yellow-highlight-note">(no pause in between- keep reading)</span> I understand that you have Medicare Parts A & B, correct?</p> <p class="note">(Wait for confirmation)</p><p class="agent-line">Great! This call is regarding your Medicare health plan. We are going to do a quick review to ensure you're receiving everything you're entitled to!</p><p class="agent-line">Can you confirm your zip code for me please?</p><p class="workflow-note">***Enter the zip code in Sunfire and click VIEW ALL PLANS***</p><p class="note">(Get zip code)</p><p class="agent-line">Thank you. Can you confirm your First Name and Last Name?</p><p class="note">(Get name)</p><p class="agent-line">Great!</p><p class="agent-line">Now, before we get started are there any specific benefits you're looking for or are you just looking to save money and increase your benefits today?</p><p class="agent-line">Great! I can help with ensuring you are receiving everything you are entitled to regarding [Insert needs]. <span class="note">OR</span> Great, I can help with ensuring you are saving money and increasing your benefits today.</p><h3>Required Disclosures & Scope of Appointment</h3><p class="agent-line">Before we take care of your needs, I'm required to read a few quick disclaimers. Then I'll get right to work for you!</p><p class="agent-line verbatim">"For your protection I do need to inform you that this call may be monitored and recorded. I also want to let you know that you will not be required to provide any health-related information unless it is necessary to determine enrollment eligibility."</p><p class="agent-line verbatim">"We do not offer every plan available in your area. Any information we provide is limited to those plans we do offer in your area. Currently we represent 10 organizations which offer 72 products in your area. Please contact Medicare.gov or 1-800-MEDICARE to get information on all of your options."</p><p class="agent-line verbatim">"Before we proceed, I want to let you know that Clearview offers Medicare Advantage and ancillary plans. Please say yes, if I have your permission to discuss such plans with you today, [Today's Month/Date/Year]?" <span class="note">(Wait for required "Yes")</span></p><p class="agent-line verbatim">"This conversation has no effect on your current or future health coverage unless you enroll in a plan today. Agreeing to this does not obligate you to enroll or automatically enroll you in a plan."</p><p class="agent-line">"I want to provide you with my direct line as well. Please grab a pen and paper and take down my phone number." <span class="yellow-highlight-note">(Agent gives name and direct line).</span></p><p class="note">(Agent Name: [Agent Name], Direct Line: [Agent Phone Number])</p>`,
+                    es: `<h3>Introducción</h3><p class="agent-line">Hola, soy [Su nombre completo], un agente de seguros con licencia con Clearview en una línea grabada. ¡Espero que estés teniendo un gran día! <span class="yellow-highlight-note">(sin pausa en el medio, sigue leyendo)</span> Entiendo que tiene Medicare Partes A y B, ¿correcto?</p> <p class="note">(Esperar confirmación)</p><p class="agent-line">¡Bien! Esta llamada se refiere a su plan de salud de Medicare. ¡Vamos a hacer una revisión rápida para asegurarnos de que está recibiendo todo lo que le corresponde!</p><p class="agent-line">¿Puede confirmarme su código postal, por favor?</p><p class="workflow-note">***Ingrese el código postal en Sunfire y haga clic en VER TODOS LOS PLANES***</p><p class="note">(Obtener código postal)</p><p class="agent-line">Gracias. ¿Puede confirmar su nombre y apellido?</p><p class="note">(Obtener nombre)</p><p class="agent-line">¡Bien!</p><p class="agent-line">Ahora, antes de comenzar, ¿hay algún beneficio específico que esté buscando o simplemente está buscando ahorrar dinero y aumentar sus beneficios hoy?</p><p class="agent-line">¡Bien! Puedo ayudarlo a asegurarse de que reciba todo lo que tiene derecho con respecto a [Insertar necesidades]. <span class="note">O:</span> Genial, puedo ayudarlo a asegurarme de que esté ahorrando dinero y aumentando sus beneficios hoy.</p><h3>Declaraciones Requeridas y Alcance de la Cita</h3><p class="agent-line">Antes de ocuparnos de sus necesidades, debo leer unas declaraciones requeridas. ¡Entonces me pondré a trabajar para ti!</p><p class="agent-line verbatim">"Para su protección, necesito informarle que esta llamada puede ser monitoreada y grabada. También quiero hacerle saber que no se le pedirá que proporcione ninguna información relacionada con la salud a menos que sea necesario para determinar la elegibilidad para la inscripción."</p><p class="agent-line verbatim">"No ofrecemos todos los planes disponibles en su área. Cualquier información que proporcionemos se limita a los planes que ofrecemos en su área. Actualmente representamos a 10 organizaciones que ofrecen 72 productos en su área. Comuníquese con Medicare.gov o llame al 1-800-MEDICARE para obtener información sobre todas sus opciones."</p><p class="agent-line verbatim">"Antes de continuar, quiero informarle que Clearview ofrece Medicare Advantage y planes auxiliares. Por favor, diga sí, si tengo su permiso para discutir dichos planes con usted hoy, [Mes/Fecha/Año de hoy]?" <span class="note">(Esperar "Sí" requerido)</span></p><p class="agent-line verbatim">"Esta conversación no tiene ningún efecto en su cobertura de salud actual o futura a menos que se inscriba en un plan hoy. Aceptar esto no lo obliga a inscribirse ni lo inscribe automáticamente en un plan."</p><p class="agent-line">"También quiero proporcionarte mi línea directa. Por favor, toma papel y bolígrafo y anota mi número de teléfono." <span class="yellow-highlight-note">(El agente da nombre y línea directa).</span></p><p class="note">(Nombre del Agente: [Nombre del Agente], Línea Directa: [Número de Teléfono del Agente])</p>`
+                }
+            },
+            {
+                title: { en: "ELIGIBILITY STATUS", es: "ESTADO DE ELEGIBILIDAD" },
+                durationMinutes: 5,
+                content: {
+                    en: `<h3>Eligibility Questions & MARx Verification</h3><p class="agent-line">Great, are you looking for benefits just for you or for you and someone else?</p><p class="note">(Confirm)</p><p class="agent-line">Do you make your own healthcare decisions?</p><p class="note">(Confirm)</p><p class="agent-line">Just to reclarify, you stated you do have Medicare Parts A and B?</p><p class="note">(Confirm)</p><p class="agent-line">Do you currently have any employer, VA benefits or TRICARE benefits?</p><p class="note">(Confirm and note)</p><div class="lookup-button-container"><h3 class="lookup-header !text-left !text-base !font-semibold">MARx Check:</h3><button id="marx-portal-btn" class="lookup-button marx">MARx Portal</button></div><p class="agent-line">Do me a favor and grab your red, white, and blue Medicare card. <span class="yellow-highlight-note">(Pause and wait to gather card information. Be patient and sound confident.)</span></p><p class="agent-line">Do I have permission to look you up in the Medicare system? <span class="yellow-highlight-note">(Obtain a clear Yes/No)</span></p><p class="workflow-note">***Obtain MBI & input into MARx.***</p><p class="note"><span class="yellow-highlight-note">(Obtain the MBI)</span></p><p class="workflow-note"><span class="yellow-highlight-note">If client is not Medicare eligible Pitch Hospital Indemnity Plan</span></p><button id="not-medicare-eligible-btn" class="mt-2 mb-2 bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150 ease-in-out w-full sm:w-auto">Not Medicare Eligible - Pitch HIP</button><p class="note">(If client doesn't have Medicare Card): "I can pull up your Medicare number with your first and last name, your DOB and your social." (Get info)</p><p class="note"><span class="yellow-highlight-note">(Verbally confirm the client's address with MARx Report info)</span></p><p class="agent-line">Are you currently receiving extra help or Medicaid?</p><p class="note">(If Yes): "Can you verify your Medicaid # for me? Take your Time." <span class="yellow-highlight-note">Verify Medicaid eligibility and level on carrier site.</span></p><p class="agent-line">Do you have any Chronic Health Conditions that require special care like Diabetes or heart disease?</p><p class="note"><span class="yellow-highlight-note">Write the answer in your notes, if YES and if non DSNP you will likely be looking into CSNP plans for them.</span></p><h3>Current Plan Verification</h3><p class="agent-line">Ok, thank you for that information. I'm going to look at your current plan to see what your benefits look like.</p><p class="workflow-note"><span class="yellow-highlight-note">***Find this plan for comparison in Sunfire - Compare for yourself not with the client.***</span></p><p class="note">(Notate name of current plan and move forward)</p>`,
+                    es: `<h3>Preguntas de Elegibilidad y Verificación MARx</h3><p class="agent-line">Genial, ¿está buscando beneficios solo para usted o para usted y otra persona?</p><p class="note">(Confirmar)</p><p class="agent-line">¿Usted toma sus propias decisiones de atención médica?</p><p class="note">(Confirmar)</p><p class="agent-line">Solo para aclarar, ¿dijo que tiene las Partes A y B de Medicare?</p><p class="note">(Confirmar)</p><p class="agent-line">¿Actualmente tiene algún empleador, beneficios de VA o beneficios de TRICARE?</p><p class="note">(Confirmar y anotar)</p><div class="lookup-button-container"><h3 class="lookup-header !text-left !text-base !font-semibold">Comprobación de MARx:</h3><button id="marx-portal-btn" class="lookup-button marx">Portal MARx</button></div><p class="agent-line">Hágame un favor y tome su tarjeta roja, blanca y azul de Medicare. <span class="yellow-highlight-note">(Haga una pausa y espere para recopilar la información de la tarjeta. Sé paciente y suena seguro).</span></p><p class="agent-line">¿Tengo permiso para buscarlo en el sistema de Medicare? <span class="yellow-highlight-note">(Obtenga un claro Sí/No)</span></p><p class="workflow-note">***Obtenga MBI e ingréselo en MARx.***</p><p class="note"><span class="yellow-highlight-note">(Obtener el MBI)</span></p><p class="workflow-note"><span class="yellow-highlight-note">Si el cliente no es elegible para Medicare, presente el Plan de Indemnización Hospitalaria</span></p><button id="not-medicare-eligible-btn" class="mt-2 mb-2 bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150 ease-in-out w-full sm:w-auto">No elegible para Medicare - Presentar HIP</button><p class="note">(Si el cliente no tiene tarjeta de Medicare): "Puedo obtener su número de Medicare con su nombre y apellido, su fecha de nacimiento y su número de seguro social." (Obtener información)</p><p class="note"><span class="yellow-highlight-note">(Confirmar verbalmente la dirección del cliente con información del Informe MARx)</span></p><p class="agent-line">¿Está recibiendo actualmente ayuda adicional o Medicaid?</p><p class="note">(Si es Sí): "¿Puede verificar su # de Medicaid por mí? Tómese su tiempo." <span class="yellow-highlight-note">Verifique la elegibilidad y el nivel de Medicaid en el sitio de la aseguradora.</span></p><p class="agent-line">¿Tiene alguna condición de salud crónica que requiera atención especial, como diabetes o enfermedad cardíaca?</p><p class="note"><span class="yellow-highlight-note">Escriba la respuesta en sus notas, si es SÍ y si no es DSNP, es probable que esté buscando planes CSNP para ellos.</span></p><h3>Verificación del Plan Actual</h3><p class="agent-line">Ok, gracias por esa información. Voy a ver su plan actual para ver cómo se ven sus beneficios.</p><p class="workflow-note"><span class="yellow-highlight-note">***Encuentre este plan para comparar en Sunfire - Compare por usted mismo, no con el cliente.***</span></p><p class="note">(Anote el nombre del plan actual y continúe)</p>`
+                }
+            },
+            {
+                title: { en: "NEEDS ANALYSIS", es: "ANÁLISIS DE NECESIDADES" },
+                durationMinutes: 15,
+                content: {
+                    en: `<h3>Needs Assessment</h3><p class="agent-line">Before we dive into the full plan details, I want to take a moment to really understand what matters most to you. Earlier, you mentioned that you were interested in [insert original stated need], it's one of our most popular products that we assist our members with! I'm going to ask a few follow-up questions to better understand your priorities. This will help me tailor everything we discuss and ensure the options I recommend truly meet your needs. Sound good?</p><p class="workflow-note">***Start with the Need they called in about.***</p><button id="occi-examples-btn" class="my-2 bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150 ease-in-out w-full sm:w-auto">OCCI EXAMPLES</button><p class="workflow-note">***Filter for the benefits needed in Sunfire and begin plan comparison.***</p><p class="note"><span class="yellow-highlight-note">(We want to obtain at least 3 needs. It isn't necessary to go over the entire list)</span></p><p class="note">Example Areas (Refer to PDF for detailed OCCI examples for each): Food Card, Dental, Vision, Hearing, Transportation, OTC Card.</p><div class="lookup-button-container"><h3 class="lookup-header !text-left !text-base !font-semibold">Provider Look Up:</h3><button id="uhc-provider-btn" class="lookup-button uhc">UHC</button><button id="aetna-provider-btn" class="lookup-button aetna">AETNA</button><button id="humana-provider-btn" class="lookup-button humana">HUMANA</button><button id="careplus-provider-btn" class="lookup-button careplus">CAREPLUS</button><button id="wellcare-provider-btn" class="lookup-button wellcare">WELLCARE</button></div><p class="workflow-note">***Agent should have guest provider site open and ready to search***</p><p class="agent-line verbatim">"To confirm there is no disruption to your care with these benefits, can you tell me the name of your primary care physician?"</p><p class="note">(Get PCP. Check network in Carrier Portal. Address status.)</p><p class="note"><span class="yellow-highlight-note">Important Note: [If assigning new PCP, you must provide PCP name and phone number]</span></p><p class="note"><span class="yellow-highlight-note">This information is crucial to properly communicate to the beneficiary whether their PCP is in or out of network. If out of network, explain that they will need to choose new ones or pay out of pocket.</span></p><p class="note"><span class="yellow-highlight-note">[If selling United Healthcare: Must assign PCP for every plan type (including PPO) & must disclose PCP first & last name, PCP ID & Phone number.]</span></p><p class="agent-line verbatim">"Can you tell me the name of any other doctors or specialists you visit so I can ensure they will be covered along with these benefits?"</p><p class="note">(Get Specialists. Check network. Address status.) <span class="yellow-highlight-note">Just like the PCP, specialists are very important and should also be assessed for whether they are in or out of network. If out of network, explain that they will need to choose new ones or pay out of pocket.</span></p><h3>Prescription Look Up</h3><div class="lookup-button-container"><h3 class="lookup-header !text-left !text-base !font-semibold">Formulary Look Up:</h3><button id="uhc-rx-btn" class="lookup-button uhc">UHC Rx</button><button id="aetna-rx-btn" class="lookup-button aetna">AETNA Rx</button><button id="humana-rx-btn" class="lookup-button humana">HUMANA Rx</button><button id="careplus-rx-btn" class="lookup-button careplus">CAREPLUS Rx</button><button id="wellcare-rx-btn" class="lookup-button wellcare">WELLCARE Rx</button></div><p class="workflow-note">***Agent should have the formulary up and ready to search***</p><p class="agent-line verbatim">"Can you tell me what Medications you are currently taking as well as their dosage? I want to ensure they are covered and cost effective."</p><p class="note">(Enter meds/dosages)</p><p class="agent-line verbatim">"Is there a pharmacy you normally use to get your medications, or do you get them via mail order?"</p><p class="note">(Note pharmacy, check preference. Review drug costs/coverage.)</p><p class="agent-line verbatim"><span class="yellow-highlight-note">[If they refuse lookup]:</span> "I understand, we do not need to look up your medications. Just be aware that if a medication is not on the formulary, it will not be paid for by Medicare or the plan without authorization from a doctor."</p><p class="note">(Agent to review drug costs and coverage based on formulary lookup and communicate findings to client.)</p><h3>Benefit Prioritization</h3><p class="note">Now it is time to prioritize what is most important to the member & recap what you covered.</p><p class="agent-line"><span class="yellow-highlight-note">Example:</span> "Is it more important to you that the providers are covered or that you get the most out of your benefits?"</p><p class="note">(Note priority.)</p>`,
+                    es: `<h3>Evaluación de Necesidades</h3><p class="agent-line">Antes de entrar en todos los detalles del plan, quiero tomarme un momento para entender realmente qué es lo más importante para usted. Anteriormente, mencionó que estaba interesado/a en [insertar necesidad original declarada], ¡es uno de nuestros productos más populares con los que ayudamos a nuestros miembros! Voy a hacerle algunas preguntas de seguimiento para entender mejor sus prioridades. Esto me ayudará a personalizar todo lo que discutamos y asegurar que las opciones que recomiende realmente satisfagan sus necesidades. ¿Le parece bien?</p><p class="workflow-note">***Comience con la Necesidad por la que llamaron.***</p><button id="occi-examples-btn" class="my-2 bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150 ease-in-out w-full sm:w-auto">EJEMPLOS OCCI</button><p class="workflow-note">***Filtre los beneficios necesarios en Sunfire y comience la comparación de planes.***</p><p class="note"><span class="yellow-highlight-note">(Queremos obtener al menos 3 necesidades. No es necesario repasar toda la lista)</span></p><p class="note">Áreas de ejemplo (Consulte el PDF para ver ejemplos detallados de OCCI para cada una): Tarjeta de Alimentos, Dental, Visión, Audición, Transporte, Tarjeta OTC.</p><div class="lookup-button-container"><h3 class="lookup-header !text-left !text-base !font-semibold">Búsqueda de Proveedores:</h3><button id="uhc-provider-btn" class="lookup-button uhc">UHC</button><button id="aetna-provider-btn" class="lookup-button aetna">AETNA</button><button id="humana-provider-btn" class="lookup-button humana">HUMANA</button><button id="careplus-provider-btn" class="lookup-button careplus">CAREPLUS</button><button id="wellcare-provider-btn" class="lookup-button wellcare">WELLCARE</button></div><p class="workflow-note">***El agente debe tener el sitio del proveedor invitado abierto y listo para buscar***</p><p class="agent-line verbatim">"Para confirmar que no haya interrupción en su atención con estos beneficios, ¿puede decirme el nombre de su médico de atención primaria?"</p><p class="note">(Obtener PCP. Verificar red en el Portal del Proveedor. Informar estado.)</p><p class="note"><span class="yellow-highlight-note">Nota importante: [Si asigna un nuevo PCP, debe proporcionar el nombre y el número de teléfono del PCP]</span></p><p class="note"><span class="yellow-highlight-note">Esta información es crucial para comunicarse adecuadamente con el beneficiario si su PCP está dentro o fuera de la red. Si están fuera de la red, explíqueles que tendrán que elegir unos nuevos o pagar de su bolsillo.</span></p><p class="note"><span class="yellow-highlight-note">[Si vende United Healthcare: Debe asignar un PCP para cada tipo de plan (incluido PPO) y debe revelar el nombre y apellido del PCP, el ID del PCP y el número de teléfono.]</span></p><p class="agent-line verbatim">"¿Puede decirme el nombre de algún otro médico o especialista que visite para que pueda asegurarme de que estarán cubiertos junto con estos beneficios?"</p><p class="note">(Obtener Especialistas. Verificar red. Informar estado.) <span class="yellow-highlight-note">Al igual que el médico de atención primaria, los especialistas son muy importantes y también deben ser evaluados para determinar si Están dentro o fuera de la red. Si están fuera de la red, explíqueles que tendrán que elegir uno nuevo o pagar de su bolsillo.</span></p><h3>Búsqueda de Recetas</h3><div class="lookup-button-container"><h3 class="lookup-header !text-left !text-base !font-semibold">Búsqueda de Formulario:</h3><button id="uhc-rx-btn" class="lookup-button uhc">UHC Rx</button><button id="aetna-rx-btn" class="lookup-button aetna">AETNA Rx</button><button id="humana-rx-btn" class="lookup-button humana">HUMANA Rx</button><button id="careplus-rx-btn" class="lookup-button careplus">CAREPLUS Rx</button><button id="wellcare-rx-btn" class="lookup-button wellcare">WELLCARE Rx</button></div><p class="workflow-note">***El agente debe tener el formulario listo para buscar***</p><p class="agent-line verbatim">"¿Puede decirme qué medicamentos está tomando actualmente, así como su dosis? Quiero asegurarme de que estén cubiertos y sean de costo efectivo."</p><p class="note">(Ingresar medicamentos/dosis)</p><p class="agent-line verbatim">"¿Hay alguna farmacia que normalmente usa para obtener sus medicamentos, o los obtiene por correo?"</p><p class="note">(Anotar farmacia, verificar preferencia. Revisar costos/cobertura de medicamentos.)</p><p class="agent-line verbatim"><span class="yellow-highlight-note">[Si se niegan a buscar]:</span> "Entiendo, no necesitamos buscar sus medicamentos. Solo tenga en cuenta que si un medicamento no está en el formulario, Medicare o el plan no lo pagarán sin la autorización de un médico."</p><p class="note">(El agente revisará los costos y la cobertura de los medicamentos según la búsqueda en el formulario y comunicará los hallazgos al cliente.)</p><h3>Priorización de beneficios</h3><p class="note">Ahora es el momento de priorizar lo que es más importante para el miembro y recapitular lo que cubrió.</p><p class="agent-line"><span class="yellow-highlight-note">Ejemplo:</span> "¿Es más importante para usted que los proveedores estén cubiertos o que usted aproveche al máximo sus beneficios?"</p><p class="note">(Anotar prioridad.)</p>`
+                }
+            },
+            {
+                title: { en: "PLAN SEARCH & HOLD", es: "BÚSQUEDA DE PLAN Y ESPERA" },
+                durationMinutes: 5, 
+                content: {
+                    en: `<h3>Plan Search & Power Hold</h3><p class="agent-line">You've shared that [insert needs,] [insert needs.] and [insert needs.] are your top priorities. I'm going to get to work for you and find an amazing match. I'll need about 2-3 minutes, so I'll place you on a brief hold-and when I come back, I'll have some great news for you!</p><p class="note"><span class="yellow-highlight-note">Example phrasing:</span> "You've shared that dental, prescription cost, and keeping your doctor are top priorities..."</p><p class="workflow-note">***Power Hold: Use this time to make sure that you have the solution READY to present.***</p><p class="note">(Place on hold. <span class="yellow-highlight-note">You must double check any doctors on carrier site to ensure they are in network at this point - you cannot use Sunfire alone for verifying doctors are in network.</span>)</p><p class="note"><span class="yellow-highlight-note">[Confirm in summary of benefits if client needs referral for specialist for HMO plan and read relevant statement during plan presentation]</span></p>`,
+                    es: `<h3>Búsqueda de Plan y Espera Estratégica</h3><p class="agent-line">Ha compartido que [insertar necesidad 1], [insertar necesidad 2] y [insertar necesidad 3] son sus principales prioridades. Voy a ponerme a trabajar para usted y encontrar una combinación increíble. Necesitaré unos 2-3 minutos, así que lo pondré en una breve espera, ¡y cuando regrese, tendré excelentes noticias para usted!</p><p class="note"><span class="yellow-highlight-note">Ejemplo de fraseo:</span> "Ha compartido que la cobertura dental, el costo de las recetas y mantener a su médico son las principales prioridades..."</p><p class="workflow-note">***Espera Estratégica: Use este tiempo para asegurarse de tener la solución LISTA para presentar.***</p><p class="note">(Poner en espera. <span class="yellow-highlight-note">Debe verificar dos veces a cualquier médico en el sitio de la aseguradora para asegurarse de que estén en la red en este momento; no puede usar Sunfire solo para verificar que los médicos estén en la red.</span>)</p><p class="note"><span class="yellow-highlight-note">[Confirme en el resumen de beneficios si el cliente necesita una remisión para un especialista para el plan HMO y lea la declaración pertinente durante la presentación del plan]</span></p>`
+                }
+            },
+            {
+                title: { en: "PLAN PRESENTATION", es: "PRESENTACIÓN DEL PLAN" },
+                durationMinutes: 3,
+                content: {
+                    en: `<h3>Needs Presentation (T.R.A.M Method)</h3><p class="agent-line"><span class="font-semibold">Thank & Thrill (Excite):</span> Thank you for holding! I have some very exciting news for you-are you ready?!</p><p class="agent-line"><span class="font-semibold">Remind (Reconnect to the Need):</span> You mentioned you're interested in dental coverage because you've been experiencing pain, and the cost of dental work has been too high. <span class="note">(Tailor to client's specific need)</span></p><p class="agent-line"><span class="font-semibold">Advise (Present the Solution Clearly):</span> Well, this new plan, the [Carrier Name] [Plan Name], gives you \$[Benefit Amount, e.g., 3,000] in dental benefits-that's a \$[Increase Amount, e.g., 1,500] increase from what you currently have!</p><p class="agent-line"><span class="font-semibold">Mention & Confirm (Confidence is key):</span> "That kind of coverage makes a difference! Based on what you told me, doesn't this plan sound like what you've been needing?"</p><p class="note">(Address questions)</p><hr class="my-4"><p class="note"><span class="yellow-highlight-note">Advise and tie down additional top needs</span></p><p class="agent-line"><span class="font-semibold">Transition to Additional Needs (Advise & Layer):</span> "I'm so glad to hear that - <strong class="text-green-600">and it gets even better.</strong> This plan doesn't just help with dental. It also includes [insert top additional benefits + features] which I know matters to you as well. Sounds like this plan is going to work for you, right?"</p><p class="note">(Wait for confirmation)</p>`,
+                    es: `<h3>Presentación de Necesidades (Método A.C.O.N.)</h3><p class="agent-line"><span class="font-semibold">Agradecer y Animar (Emocionar):</span> ¡Gracias por esperar! Tengo noticias muy emocionantes para usted, ¿está listo/a?!</p><p class="agent-line"><span class="font-semibold">Conectar (Reconectar con la Necesidad):</span> Usted mencionó que está interesado/a en la cobertura dental porque ha estado experimentando dolor y el costo del trabajo dental ha sido demasiado alto. <span class="note">(Adaptar a la necesidad específica del cliente)</span></p><p class="agent-line"><span class="font-semibold">Ofrecer (Presentar la Solución Claramente):</span> Bueno, este nuevo plan, el [Nombre de la Aseguradora] [Nombre del Plan], le ofrece \$[Monto del Beneficio, ej., 3,000] en beneficios dentales, ¡eso es un aumento de \$[Monto del Aumento, ej., 1,500] con respecto a lo que tiene actualmente!</p><p class="agent-line"><span class="font-semibold">Notificar y Confirmar (La confianza es clave):</span> "¡Ese tipo de cobertura marca la diferencia! Basado en lo que me dijo, ¿no le parece que este plan es lo que ha estado necesitando?"</p><p class="note">(Responder preguntas)</p><hr class="my-4"><p class="note"><span class="yellow-highlight-note">Aconsejar y asegurar necesidades principales adicionales</span></p><p class="agent-line"><span class="font-semibold">Transición a Necesidades Adicionales (Aconsejar y Añadir):</span> "Me alegra mucho escuchar eso, <strong class="text-green-600">¡y se pone aún mejor!</strong> Este plan no solo ayuda con la cobertura dental. También incluye [insertar principales beneficios adicionales + características] que sé que también le importan. Parece que este plan va a funcionar para usted, ¿verdad?"</p><p class="note">(Esperar confirmación)</p>`
+                }
+            },
+            {
+                title: { en: "CLOSE", es: "CIERRE" },
+                durationMinutes: 5,
+                content: {
+                    en: `<h3>Assume the Sale & SEP Check</h3><p class="agent-line">Congratulations! Not only are you fully eligible for this plan, but it sounds like this plan will really address your current needs and put you in a better position! The next step is to complete your application so coverage can begin on the 1st.</p><p class="agent-line">Can you verify your mailing address is the same as your physical address?</p><p class="note">(Confirm address)</p><div id="sep-check-container"><div class="sep-button-container"><button id="sep-identified-btn" class="my-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150 ease-in-out w-full sm:w-auto">SEP Identified - Show Benefits</button><button id="sep-finder-btn" class="my-2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150 ease-in-out w-full sm:w-auto">SEP Finder</button><button id="spap-finder-btn" class="my-2 lookup-button spap w-full sm:w-auto">SPAP Finder</button></div><p class="agent-line">If there is an SEP: "Lets gets your enrollment, started!!"</p><p class="note">(If SEP identified, click "SEP Identified" button above to show benefits summary)</p><hr class="my-4"><p class="agent-line">If no SEP identified: "Before we can get your enrollment started, we need to ensure we have a qualifying special election period for you. I'm going to ask you a few questions to see if these circumstances apply to you. <span class="yellow-highlight-note">(If still unable to identify PITCH Hospital Indemnity Plan)</span>"</p><p class="note">(Agent asks SEP qualifying questions)</p><button id="no-sep-identified-btn" class="mt-2 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150 ease-in-out w-full sm:w-auto">Still No SEP - Pitch HIP</button></div><div id="required-benefits-summary" class="mt-4 hidden"> <h3>Required Benefits Summary</h3><p class="agent-line">Now I just need to go over a few required benefits. You will get all of this in writing as well!</p><p class="agent-line">Your plan begins on [Effective Date]. If anyone else, you know could benefit from this type of help, I'd be happy to assist them too. Please provide them with my direct phone number.</p><p class="note"><span class="yellow-highlight-note">[Note: If there is a premium but LIS brings it down to $0, you must still disclose the actual premium amount. Read Core Benefits in order.]</span></p><ul><li><span class="font-semibold">Plan Name & Effective Date & Plan Type:</span> [Must disclose full name of the plan. Example Humana Gold Plus H1036-054C HMO]. Effective [Date].</li><li><span class="font-semibold">Premium:</span> The plan premium is $[Premium Amount] per month.</li><li><span class="font-semibold">Part B Premium Giveback:</span> (if applicable)</li><li><span class="font-semibold">Maximum out of Pocket (Medical):</span> $[MOOP Amount].</li><li><span class="font-semibold">Medical Deductible:</span> $[Medical Deductible Amount].</li><li><span class="font-semibold">Prescription Drug Deductible:</span> $[Drug Deductible Amount].</li><li><span class="font-semibold">Hospital Copay:</span> "The Inpatient/Outpatient Hospital Copay (in/out of network) is: $[Copay Amount] per day for the first [X] days." <span class="note">We will discuss protection for this amount later in this call.</span></li><li><span class="font-semibold">PCP Copay:</span> (in/out of network) is: $[Copay Amount].</li><li><span class="font-semibold">Preventative Care:</span> "This plan covers your preventative care. You can get your annual wellness visit including any lab work, flu vaccine and other preventative services at no cost."</li><li><span class="font-semibold">Specialist Copay:</span> $[Copay Amount].</li><li><span class="font-semibold">ER/Urgent care Copay:</span> $[Copay Amount].</li><li><span class="font-semibold">Mental Health inpatient/outpatient Copay:</span> (in/out of network) is: $[Copay Amount].</li><li><span class="font-semibold">Provider Network Status (PCP):</span> <span class="yellow-highlight-note">** State PCP Full name, Address, PCP ID & advise if PCP is in/out network.</span></li><li><span class="font-semibold">Current Drug Tiers and Restrictions:</span> (Prior Authorization, Quantity Limits, Step Therapy) <span class="verbatim"><span class="yellow-highlight-note">[MUST READ]</span> "Certain medications have prior authorization requirements; all you have to do is call the prescribing doctor and request a prior authorization to be sent to (carrier you are selling) if that is the case."</span></li><li><span class="font-semibold">Prescription Deductible, Initial Coverage/Tiers, Catastrophic Coverage copays:</span> <span class="yellow-highlight-note">Read directly from the Summary of Benefits.</span></li><li><span class="font-semibold">Pharmacy Network Status</span></li><li><span class="note"><span class="yellow-highlight-note">Only are required to go over the benefits below, if specifically discussed/mentioned on the call. Check SOB/EOC for details for the benefits below:</span> Hearing, Dental, Vision, Transportation, Silver Sneakers/Fitness, Nurses Hotline, Over the Counter <span class="yellow-highlight-note">(Search for food, utility and rent benefit. Do not assume that every OTC cared covers food)</span>, Healthy Food Card, Part B Rebate/Giveback. <span class="yellow-highlight-note">[The benefits in this section may not be available with all plans in all areas, confirm it is before reading.]</span> <span class="yellow-highlight-note">Check SOB/EOC for details for the benefits below:</span></span></li></ul><h3>Plan Types Explanation</h3><p class="note"><span class="yellow-highlight-note">[Confirm in summary of benefits if client needs referral for specialist for HMO plan and read relevant statement]</span></p><p class="agent-line"><span class="note">(If HMO w/ Referrals):</span> "This plan is an HMO plan which means you will generally have to see your primary care doctor first if you need to see a specialist, your primary care provider acts as the gatekeeper and will coordinate care for you."</p><p class="agent-line"><span class="note">(If HMO w/o Referrals):</span> "Although this plan is an HMO and you have a primary care provider assigned who will coordinate your care, with this plan referrals are not required to see an in-network specialist."</p><p class="agent-line"><span class="note">(If PPO):</span> "This is a PPO plan, which allows you to see in-network specialists without needing a referral. PPO plans also covers providers that are out-of-network. <span class="verbatim"><span class="yellow-highlight-note">[IF PPO/POS Plan must read:]</span> If you go out of the network, make sure the doctor is going to accept the plan and is Medicare Approved. Otherwise, you may have to pay the full price. Seeing providers in-network may keep costs lower.</span>"</p><h3>Intent to Enroll Confirmation</h3><p class="agent-line">Now Mr./Mrs. [Client Last Name], if you would like to take advantage of these benefits and want to have [CLIENT'S NEEDS/PAINPOINTS addressed], all you need to do is wait until the first of next month for the plan to take effect. So, for you this plan would begin on XX/01/2025. That sounds great, right?</p><p class="note">(Wait for "Great!")</p><p class="agent-line">Mr./Mrs. [Client Last Name], I am going to be your agent of record moving forward. So, if you need anything or have any questions, I am going to be your go to resource. Please feel free to pass my information along to anyone you know that may also need help with their Medicare health plan.</p><p class="agent-line">Please write down my Secure Phone Line. The number is [Agent Phone Number].</p><p class="agent-line">Please also write down the name of the plan that you are enrolling into. It's called [Full Plan Name - Agent Must Disclose]. <span class="yellow-highlight-note">(Example: Humana Gold Plus H1036-054C HMO)</span></p><div class="highlight-box highlight-box-blue"><p class="highlight-title">(IF OUTBOUND LINE or LIVE TRANSFER lead - MUST GET CALL BACK):</p><p class="agent-line verbatim">"Mr./Mrs. [Client Last Name], to process your application over the phone, Medicare requires that we complete the enrollment on an inbound phone call on my secure Line. This is the phone # that I just gave you. <span class="yellow-highlight-note">(Repeat the phone # if needed.)</span> So, I've got all your information pulled up here and just need you to call me right back and I will take care of your application."</p><p class="note">(Wait for callback, then proceed to next section: POST-APP & WRAP UP, starting with "Inbound Enrollment Call")</p></div><div class="highlight-box highlight-box-green"><p class="highlight-title">(IF ON AN INBOUND LINE ALREADY):</p><p class="agent-line">Perfect! So Mr/Mrs. [Client Last Name], what we are going to do now is begin the application for the plan we just discussed. Just to be clear you want to enroll into the [New plan name] that will start on [Date], and the day it goes into effect, it will be taking the place of your existing [current carrier] plan. Sound good, right?</p><p class="note">(Proceed to next section: POST-APP & WRAP UP, starting with "Inbound Enrollment Call" - specifically the Sunfire Application part. Agent clicks "Next" button.)</p></div></div> `,
+                    es: `<h3>Asumir la Venta y Verificación de SEP</h3><p class="agent-line">¡Felicidades! No solo es totalmente elegible para este plan, sino que parece que este plan realmente abordará sus necesidades actuales y lo pondrá en una mejor posición. El siguiente paso es completar su solicitud para que la cobertura pueda comenzar el día 1.</p><p class="agent-line">¿Puede verificar que su dirección postal es la misma que su dirección física?</p><p class="note">(Confirmar dirección)</p><div id="sep-check-container"><div class="sep-button-container"><button id="sep-identified-btn" class="my-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150 ease-in-out w-full sm:w-auto">SEP Identificado - Mostrar Beneficios</button><button id="sep-finder-btn" class="my-2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150 ease-in-out w-full sm:w-auto">Buscador SEP</button><button id="spap-finder-btn" class="my-2 lookup-button spap w-full sm:w-auto">Buscador SPAP</button></div><p class="agent-line">Si hay un SEP: "¡¡Vamos a que comience su inscripción!!"</p><p class="note">(Si se identifica un SEP, haga clic en el botón "SEP Identificado" de arriba para mostrar el resumen de beneficios)</p><hr class="my-4"><p class="agent-line">Si no se identificó ningún SEP: "Antes de que podamos comenzar su inscripción, debemos asegurarnos de tener un período de elección especial calificado para usted. Voy a hacerle algunas preguntas para ver si estas circunstancias se aplican a usted. <span class="yellow-highlight-note">(Si aún no puede identificar, PRESENTE el Plan de Indemnización Hospitalaria)</span>"</p><p class="note">(El agente hace preguntas de calificación SEP)</p><button id="no-sep-identified-btn" class="mt-2 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150 ease-in-out w-full sm:w-auto">Aún Sin SEP - Presentar HIP</button></div><div id="required-benefits-summary" class="mt-4 hidden"> <h3>Resumen de Beneficios Requeridos</h3><p class="agent-line">"Ahora solo tengo que repasar los beneficios requeridos. ¡Todo esto también lo tendrás por escrito!"</p><p class="agent-line">Su plan comienza el [Fecha de entrada en vigor]. Si alguien más que conozca podría beneficiarse de este tipo de ayuda, estaré encantado de ayudarles también. Por favor, proporcióneles mi número de teléfono directo.</p><p class="note"><span class="yellow-highlight-note">[Nota: Si hay una prima pero LIS la reduce a $0, aún debe revelar el monto real de la prima. Lea los beneficios principales en orden.]</span></p><ul><li><span class="font-semibold">Nombre del plan, fecha de entrada en vigencia y tipo de plan:</span> [Debe revelar el nombre completo del plan. Ejemplo Humana Gold Plus H1036-054C HMO]. Vigente desde [Fecha].</li><li><span class="font-semibold">Prima:</span> La prima del plan es de $[Monto de la Prima] por mes.</li><li><span class="font-semibold">Reembolso de la prima de la Parte B:</span> (si aplica)</li><li><span class="font-semibold">Máximo desembolso de bolsillo (Médico):</span> $[Monto MOOP].</li><li><span class="font-semibold">Deducible médico:</span> $[Monto del Deducible Médico].</li><li><span class="font-semibold">Deducible de medicamentos recetados:</span> $[Monto del Deducible de Medicamentos].</li><li><span class="font-semibold">Copago hospitalario:</span> "El copago hospitalario para pacientes hospitalizados/ambulatorios (dentro/fuera de la red) es: $[Monto del Copago] por día durante los primeros [X] días." <span class="note">Discutiremos la protección para esta cantidad más adelante en esta llamada.</span></li><li><span class="font-semibold">Copago del PCP:</span> (dentro/fuera de la red) es: $[Monto del Copago].</li><li><span class="font-semibold">Atención preventiva:</span> "Este plan cubre su atención preventiva. Puede obtener su visita anual de bienestar, incluidos los análisis de laboratorio, la vacuna contra la gripe y otros servicios preventivos sin costo alguno."</li><li><span class="font-semibold">Copago del especialista:</span> $[Monto del Copago].</li><li><span class="font-semibold">Copago de sala de emergencias/atención de urgencia:</span> $[Monto del Copago].</li><li><span class="font-semibold">Copago de salud mental para pacientes hospitalizados/ambulatorios:</span> (dentro/fuera de la red) es: $[Monto del Copago].</li><li><span class="font-semibold">Estado de la red del proveedor (PCP):</span> <span class="yellow-highlight-note">** Indique el nombre completo del PCP, dirección, ID del PCP e informe si el PCP está dentro o fuera de la red.</span></li><li><span class="font-semibold">Niveles y restricciones actuales de medicamentos:</span> (Autorización previa, Límites de cantidad, Terapia escalonada) <span class="verbatim"><span class="yellow-highlight-note">[DEBE LEER]</span> "Ciertos medicamentos tienen requisitos de autorización previa; todo lo que tiene que hacer es llamar al médico que los recetó y solicitar que se envíe una autorización previa a (aseguradora que está vendiendo) si ese es el caso."</span></li><li><span class="font-semibold">Deducible de medicamentos recetados, cobertura/niveles iniciales, copagos de cobertura catastrófica:</span> <span class="yellow-highlight-note">Lea directamente del Resumen de beneficios.</span></li><li><span class="font-semibold">Estado de la red de farmacias</span></li><li><span class="note"><span class="yellow-highlight-note">Solo se requiere repasar los beneficios a continuación, si se discuten/mencionan específicamente en la llamada. Consulte SOB/EOC para obtener detalles sobre los beneficios a continuación:</span> Audición, Dental, Visión, Transporte, Silver Sneakers/Fitness, Línea directa de enfermería, Venta libre <span class="yellow-highlight-note">(Busque beneficios de alimentos, servicios públicos y alquiler. No asuma que todos los cuidados de venta libre cubren alimentos)</span>, Tarjeta de Alimentos Saludables, Reembolso/Devolución de la Parte B. <span class="yellow-highlight-note">[Es posible que los beneficios de esta sección no estén disponibles con todos los planes en todas las áreas, confirme que lo estén antes de leer.]</span> <span class="yellow-highlight-note">Consulte SOB/EOC para obtener detalles sobre los beneficios a continuación:</span></span></li></ul><h3>Explicación de Tipos de Planes</h3><p class="note"><span class="yellow-highlight-note">[Confirme en el resumen de beneficios si el cliente necesita una remisión a un especialista para el plan HMO y lea la declaración pertinente]</span></p><p class="agent-line"><span class="note">(Si es HMO con remisiones):</span> "Este plan es un plan HMO, lo que significa que generalmente tendrá que ver primero a su médico de atención primaria si necesita ver a un especialista; su proveedor de atención primaria actúa como guardián y coordinará la atención para usted."</p><p class="agent-line"><span class="note">(Si es HMO sin remisiones):</span> "Aunque este plan es un HMO y tiene un proveedor de atención primaria asignado que coordinará su atención, con este plan no se requieren remisiones para ver a un especialista dentro de la red."</p><p class="agent-line"><span class="note">(Si es PPO):</span> "Este es un plan PPO, que le permite ver a especialistas dentro de la red sin necesidad de una remisión. Los planes PPO también cubren a los proveedores que están fuera de la red. <span class="verbatim"><span class="yellow-highlight-note">[SI ES UN PLAN PPO/POS, DEBE LEER:]</span> Si sale de la red, asegúrese de que el médico acepte el plan y esté aprobado por Medicare. De lo contrario, es posible que tenga que pagar el precio completo. Ver a los proveedores dentro de la red puede mantener los costos más bajos.</span>"</p><h3>Confirmación de Intención de Inscripción</h3><p class="agent-line">"Ahora Sr./Sra. [Apellido del Cliente], si desea aprovechar estos beneficios y desea que se aborden [NECESIDADES/PUNTOS DÉBILES DEL CLIENTE], todo lo que necesita hacer es esperar hasta el primero del próximo mes para que el plan entre en vigor. Entonces, para usted este plan comenzaría el XX/01/2025. Suena genial, ¿verdad?"</p><p class="note">(Esperar "¡Genial!")</p><p class="agent-line">"Sr./Sra. [Apellido del Cliente], voy a ser su agente de registro en el futuro. Entonces, si necesita algo o tiene alguna pregunta, seré su recurso de referencia. Por favor, siéntase libre de pasar mi información a cualquier persona que conozca que también pueda necesitar ayuda con su plan de salud de Medicare."</p><p class="agent-line">"Por favor, anote mi Línea Telefónica Segura. El número es [Número de Teléfono del Agente]."</p><p class="agent-line">"Anote también el nombre del plan en el que se está inscribiendo. Se llama [Nombre Completo del Plan - El Agente Debe Revelarlo]. <span class="yellow-highlight-note">(Ejemplo: Humana Gold Plus H1036-054C HMO)</span>"</p><div class="highlight-box highlight-box-blue"><p class="highlight-title">(SI ES UNA LÍNEA SALIENTE o CLIENTE POTENCIAL DE TRANSFERENCIA EN VIVO - DEBE OBTENER UNA DEVOLUCIÓN DE LLAMADA):</p><p class="agent-line verbatim">"Sr./Sra. [Apellido del Cliente], para procesar su solicitud por teléfono, Medicare requiere que completemos la inscripción en una llamada telefónica entrante en mi Línea segura. Este es el número de teléfono que le acabo de dar. <span class="yellow-highlight-note">(Repita el número de teléfono si es necesario).</span> Entonces, tengo toda su información aquí y solo necesito que me devuelva la llamada y me encargaré de su solicitud."</p><p class="note">(Esperar la devolución de llamada, luego proceder a la siguiente sección: POST-SOLICITUD Y CIERRE, comenzando con "Llamada de Inscripción Entrante")</p></div><div class="highlight-box highlight-box-green"><p class="highlight-title">(SI YA ESTÁ EN UNA LÍNEA ENTRANTE):</p><p class="agent-line">¡Perfecto! Entonces, Sr./Sra. [Apellido del Cliente], lo que vamos a hacer ahora es comenzar la solicitud para el plan que acabamos de discutir. Solo para que quede claro, desea inscribirse en el [nombre del nuevo plan] que comenzará el [Fecha], y el día en que entre en vigor, reemplazará su plan existente de [aseguradora actual]. Suena bien, ¿verdad?</p><p class="note">(Proceder a la siguiente sección: POST-SOLICITUD Y CIERRE, comenzando con "Llamada de Inscripción Entrante", específicamente la parte de la Solicitud de Sunfire. El agente hace clic en el botón "Siguiente".)</p></div></div> `,
+                }
+            },
+            {
+                title: { en: "POST-APP & WRAP UP", es: "POST-APLICACIÓN Y CIERRE FINAL" },
+                durationMinutes: 9,
+                content: {
+                    en: `<h3>Inbound Enrollment Call</h3><p class="agent-line">Thank you for calling Clearview, proud partner of [State Carrier Name], this is <span class="yellow-highlight-note">must state FIRST AND LAST Name</span> speaking. I am a licensed sales agent in the state of <span class="yellow-highlight-note">must say client's state</span> and will be assisting you in completing this application.</p><p class="agent-line">The name of the Medicare Advantage Plan that you would like to enroll in today is called [Plan Name], correct?</p><p class="note">(Wait for "Great!")</p><p class="agent-line verbatim">"Before we get started, there is a brief statement required by Medicare. For your protection I do need to inform you that this call may be monitored and recorded and may be shared with insurance companies who administer the plans we sell. I also want to let you know that you will not be required to provide any health- related information unless it is necessary to determine enrollment eligibility."</p><p class="note">[Proceed to Sunfire and read app verbatim]</p><h3>Post-Application & Next Steps</h3><p class="note">(After Sunfire app completion):</p><p class="agent-line">"Congratulations! We'vefinished the application. Your enrollment confirmation number is [Read Enrollment ID] with a proposed effective date of (XX/01/2025) the First of Next Month. You should receive a text message from a 5-digit number in the next few seconds. It contains a link to your member portal where we will send you important updates about your plan, please open it when you see it."</p><p class="note">*Once member has clicked the link and confirmed they are viewing the portal*</p><p class="agent-line">"You will see a welcome message that includes a recap of our conversation today and some important next steps. For now, scroll to the bottom and you will see 'Tap to Save this Number as a Contact.' Click that and hit save once our information populates on your phone. Now you have Clearview in your contacts as a resource moving forward." <span class="yellow-highlight-note">Guide the member to contact card and make sure they hit save in their phone.</span></p>${hospitalIndemnityPitchHTML.en} <h3>Final Steps & Closing</h3><p class="agent-line">"You can find the Evidence of Coverage document on [Carrier's] website or by calling [Carrier's] Customer Service for a copy. In the next 7-14 business days you will receive your welcome packet, including cards and the Summary of Benefits in the US Postal mail. Put this card in your wallet so you can use it when visiting providers. Please put your Red, White, and Blue Medicare card somewhere safe, as you will not need this at appointments. Please also be on the lookout for a text message from us confirming your new plan choice."</p><p class="agent-line">"You will also receive a cancellation call from your current carrier. This is normal and will not take effect until the first of next month. You have the right to cancel your enrollment. If you choose to do so, you can call the plan before the effective date. Once you have your cards, do not forget to update your doctor's office and pharmacy with the new card information. This will allow you to make a smooth transition into this plan."</p><p class="agent-line">"Remember, our member care department is always here to help you with all of your Medicare needs. Keep in mind MEDICARE will never contact you via phone call. You can contact our member care department at [888-596-1830] or your Carrier directly at [Carrier Phone Number] with any questions."</p><p class="note"><span class="yellow-highlight-note">(If member stated another person in their house has Medicare A & B, request to speak to that person and read script from the beginning)</span></p><p class="agent-line">"Thank you very much for your time and have a great rest of your day!"</p><div class="lookup-button-container mt-4"><p class="workflow-note mr-2"><span class="yellow-highlight-note">[Hang up, fill out sales order, onto next]</span></p><button id="mapd-sales-form-btn" class="lookup-button sales-form">MAPD SALES FORM</button><button id="ancillary-sales-form-btn" class="lookup-button sales-form">ANCILLARY SALES FORM</button></div><div class="mt-6 text-center"><button id="end-call-grade-btn" class="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-lg transition duration-150 ease-in-out text-lg">End Call & AI Grade</button></div>`,
+                    es: `<h3>Llamada de Inscripción Entrante</h3><p class="agent-line">Gracias por llamar a Clearview, orgulloso socio de [Nombre de la Aseguradora Estatal], habla <span class="yellow-highlight-note">debe indicar NOMBRE Y APELLIDO</span>. Soy un agente de ventas con licencia en el estado de <span class="yellow-highlight-note">debe decir el estado del cliente</span> y lo asistiré para completar esta solicitud.</p><p class="agent-line">El nombre del Plan Medicare Advantage en el que le gustaría inscribirse hoy se llama [Nombre del Plan], ¿correcto?</p><p class="note">(Esperar "¡Genial!")</p><p class="agent-line verbatim">"Antes de comenzar, hay una breve declaración requerida por Medicare. Para su protección, necesito informarle que esta llamada puede ser monitoreada y grabada y puede ser compartida con las compañías de seguros que administran los planes que vendemos. También quiero hacerle saber que no se le pedirá que proporcione ninguna información relacionada con la salud a menos que sea necesario para determinar la elegibilidad para la inscripción."</p><p class="note">[Proceder a Sunfire y leer la aplicación textualmente]</p><h3>Post-Solicitud y Próximos Pasos</h3><p class="note">(Después de completar la aplicación en Sunfire):</p><p class="agent-line">"¡Felicidades! Hemos finalizado la solicitud. Su número de confirmación de inscripción es [Leer ID de Inscripción] con una fecha de entrada en vigor propuesta del (XX/01/2025), el primero del próximo mes. Debería recibir un mensaje de texto de un número de 5 dígitos en los próximos segundos. Contiene un enlace a su portal de miembro donde le enviaremos actualizaciones importantes sobre su plan, por favor ábralo cuando lo vea."</p><p class="note">*Una vez que el miembro haya hecho clic en el enlace y confirmado que está viendo el portal*</p><p class="agent-line">"Verá un mensaje de bienvenida que incluye un resumen de nuestra conversación de hoy y algunos próximos pasos importantes. Por ahora, desplácese hasta la parte inferior y verá 'Toque para Guardar este Número como Contacto'. Haga clic ahí y presione guardar una vez que nuestra información aparezca en su teléfono. Ahora tiene a Clearview en sus contactos como recurso en el futuro." <span class="yellow-highlight-note">Guíe al miembro a la tarjeta de contacto y asegúrese de que la guarde en su teléfono.</span></p>${hospitalIndemnityPitchHTML.es} <h3>Pasos Finales y Cierre</h3><p class="agent-line">"Puede encontrar el documento de Evidencia de Cobertura en el sitio web de [Aseguradora] o llamando al Servicio al Cliente de [Aseguradora] para obtener una copia. En los próximos 7-14 días hábiles recibirá su paquete de bienvenida, incluidas las tarjetas y el Resumen de Beneficios por correo postal de EE. UU. Ponga esta tarjeta en su billetera para que pueda usarla cuando visite a los proveedores. Por favor, guarde su tarjeta roja, blanca y azul de Medicare en un lugar seguro, ya que no la necesitará en las citas. Por favor, esté atento también a un mensaje de texto nuestro confirmando su nueva elección de plan."</p><p class="agent-line">"También recibirá una llamada de cancelación de su aseguradora actual. Esto es normal y no entrará en vigor hasta el primero del próximo mes. Tiene derecho a cancelar su inscripción. Si decide hacerlo, puede llamar al plan antes de la fecha de entrada en vigor. Una vez que tenga sus tarjetas, no olvide actualizar la información de la nueva tarjeta en el consultorio de su médico y en la farmacia. Esto le permitirá realizar una transición sin problemas a este plan."</p><p class="agent-line">"Recuerde, nuestro departamento de atención al miembro siempre está aquí para ayudarlo con todas sus necesidades de Medicare. Tenga en cuenta que MEDICARE nunca se comunicará con usted por teléfono. Puede comunicarse con nuestro departamento de atención al miembro al [888-596-1830] o directamente con su Aseguradora al [Número de Teléfono de la Aseguradora] si tiene alguna pregunta."</p><p class="note"><span class="yellow-highlight-note">(Si el miembro indicó que otra persona en su casa tiene Medicare A y B, solicite hablar con esa persona y lea el guion desde el principio)</span></p><p class="agent-line">"¡Muchas gracias por su tiempo y que tenga un excelente resto del día!"</p><div class="lookup-button-container mt-4"><p class="workflow-note mr-2"><span class="yellow-highlight-note">[Cuelgue, complete la orden de venta, continúe con la siguiente]</span></p><button id="mapd-sales-form-btn" class="lookup-button sales-form">FORMULARIO DE VENTA MAPD</button><button id="ancillary-sales-form-btn" class="lookup-button sales-form">FORMULARIO DE VENTA AUXILIAR</button></div><div class="mt-6 text-center"><button id="end-call-grade-btn" class="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-lg transition duration-150 ease-in-out text-lg">Finalizar Llamada y Calificar con IA</button></div>`
+                }
+            }
+        ];
+
+
+        // --- DOM Elements ---
+        const scriptContentEl = document.getElementById('script-content');
+        const interactionPanelEl = document.getElementById('interaction-panel'); 
+        const aiClientResponseDisplayEl = document.getElementById('ai-client-response-display'); 
+        const conversationLogDisplayEl = document.getElementById('conversation-log-display'); 
+        const sectionTitleEl = document.getElementById('section-title');
+        const sectionTimerEl = document.getElementById('section-timer');
+        const sectionTargetTimeEl = document.getElementById('section-target-time');
+        const totalTimerEl = document.getElementById('total-timer');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const startOverBtn = document.getElementById('start-over-btn');
+        const bodyEl = document.body; 
+        const sessionNotesTextarea = document.getElementById('session-notes-textarea'); 
+        const fullCallTranscriptDisplayEl = document.getElementById('full-call-transcript-display');
+        const persistentNotesContainer = document.getElementById('persistent-notes-container'); 
+        const minimizeNotesBtn = document.getElementById('minimize-notes-btn'); 
+        const languageToggleBtn = document.getElementById('language-toggle-btn'); 
+        const mainTitleEl = document.getElementById('main-title'); 
+        const sessionNotesTitleEl = document.getElementById('session-notes-title'); 
+        const sectionTimeLabelEl = document.getElementById('section-time-label'); 
+        const currentSectionLabelEl = document.getElementById('current-section-label'); 
+        const totalCallTimeLabelEl = document.getElementById('total-call-time-label'); 
+        const hipModalEl = document.getElementById('hip-modal');
+        const hipModalTitleEl = document.getElementById('hip-modal-title');
+        const hipModalBodyEl = document.getElementById('hip-modal-body');
+        const hipModalCloseBtnEl = document.getElementById('hip-modal-close-btn');
+        const occiExamplesModalEl = document.getElementById('occi-examples-modal');
+        const occiExamplesModalBodyEl = document.getElementById('occi-examples-modal-body');
+        const occiExamplesModalCloseBtnEl = document.getElementById('occi-examples-modal-close-btn');
+        const toggleListeningBtn = document.getElementById('toggle-listening-btn');
+        const listeningStatusEl = document.getElementById('listening-status');
+        const transcribedTextDisplayEl = document.getElementById('transcribed-text-display'); 
+        const callGradingModalEl = document.getElementById('call-grading-modal');
+        const callGradingModalCloseBtnEl = document.getElementById('call-grading-modal-close-btn');
+        const callGradingModalTitleEl = document.getElementById('call-grading-modal-title');
+        const gradingCriteriaDisplayContainerEl = document.getElementById('grading-criteria-display-container');
+        const aiGradingStatusEl = document.getElementById('ai-grading-status');
+        const downloadGradePdfBtnEl = document.getElementById('download-grade-pdf-btn');
+        const gradeResultsDisplayEl = document.getElementById('grade-results-display');
+        const totalScoreDisplayEl = document.getElementById('total-score-display');
+        const percentageDisplayEl = document.getElementById('percentage-display');
+        const passFailStatusDisplayEl = document.getElementById('pass-fail-status-display');
+        const overallGradeDisplayEl = document.getElementById('overall-grade-display');
+        const evaluatorNameInput = document.getElementById('evaluator-name');
+        const agentNameGradeInput = document.getElementById('agent-name-grade');
+        const evaluationDateInput = document.getElementById('evaluation-date');
+
+
+        // --- State Variables ---
+        let currentSectionIndex = 0;
+        let sectionIntervalId = null;
+        let totalIntervalId = null;
+        let sectionSecondsRemaining = 0;
+        let totalSecondsElapsed = 0;
+        let targetSectionSeconds = 0;
+        let notesMinimized = false; 
+        let currentLanguage = 'en'; 
+        let isListening = false; 
+        let simulationActive = false; 
+        let recognition; 
+        let fullCallTranscript = ""; 
+        let aiGeneratedScores = []; 
+        let conversationHistory = []; 
+        const MAX_CONVERSATION_LOG = 10; 
+        let isAIClientProcessing = false; 
+
+        const allowedStates = ["AR", "AZ", "FL", "GA", "KY", "LA", "MI", "MS", "NC", "OH", "PA", "SC", "TN", "VA", "WV"];
+        const sampleZipsByState = {
+            "AR": ["72201", "72701", "71601"], "AZ": ["85001", "85701", "86001"],
+            "FL": ["33101", "32801", "33602"], "GA": ["30301", "31401", "30901"],
+            "KY": ["40202", "40502", "41071"], "LA": ["70112", "70802", "71101"],
+            "MI": ["48201", "49503", "48901"], "MS": ["39201", "38930", "39501"],
+            "NC": ["27601", "28202", "27401"], "OH": ["43215", "45202", "44113"],
+            "PA": ["19102", "15219", "17101"], "SC": ["29201", "29401", "29601"],
+            "TN": ["37201", "38103", "37901"], "VA": ["23219", "22201", "20109"],
+            "WV": ["25301", "26505", "25701"]
+        };
+
+        let mockClientProfile = {
+            state: "",
+            zipCode: "",
+            interest: "a food card", 
+            name: "Pat Smith" 
+        };
+
+        function generateMockClientProfile() {
+            const randomStateIndex = Math.floor(Math.random() * allowedStates.length);
+            mockClientProfile.state = allowedStates[randomStateIndex];
+            const zipsForState = sampleZipsByState[mockClientProfile.state];
+            const randomZipIndex = Math.floor(Math.random() * zipsForState.length);
+            mockClientProfile.zipCode = zipsForState[randomZipIndex];
+            console.log("Generated mock client profile:", mockClientProfile);
+        }
+
+
+        // --- Initialize Speech Recognition ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = true; 
+            recognition.interimResults = true; 
+            recognition.lang = currentLanguage === 'en' ? 'en-US' : 'es-ES'; 
+
+            recognition.onstart = () => {
+                if (simulationActive) { 
+                    listeningStatusEl.textContent = langStrings[currentLanguage].listeningStatusListening;
+                }
+            };
+
+            recognition.onresult = async (event) => { 
+                if (isAIClientProcessing) return; 
+
+                let interimTranscript = '';
+                let finalTranscriptSegment = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscriptSegment += event.results[i][0].transcript + ' '; 
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+                transcribedTextDisplayEl.textContent = finalTranscriptSegment + interimTranscript; 
+                
+                if (finalTranscriptSegment.trim() && simulationActive) { 
+                    isAIClientProcessing = true; 
+                    
+                    const agentUtterance = finalTranscriptSegment.trim();
+                    fullCallTranscript += `Agent: ${agentUtterance}\n`; 
+                    if(fullCallTranscriptDisplayEl) fullCallTranscriptDisplayEl.value = fullCallTranscript; 
+                    addToConversationLog("agent", agentUtterance);
+
+                    listeningStatusEl.textContent = langStrings[currentLanguage].listeningStatusAwaitingClient;
+                    await getAIClientResponse(agentUtterance); 
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                let errorMessage = langStrings[currentLanguage].listeningStatusError;
+                if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                    errorMessage = langStrings[currentLanguage].listeningStatusPermissionDenied;
+                } else if (event.error === 'no-speech') {
+                    errorMessage = "No speech detected. Please try again."; 
+                } else if (event.error === 'aborted') {
+                    console.log("Speech recognition aborted.");
+                    if (simulationActive && !isAIClientProcessing) {
+                        startListeningInternal();
+                    }
+                    return; 
+                } else if (event.error === 'network') {
+                    errorMessage = "Network error with speech service.";
+                }
+
+                listeningStatusEl.textContent = errorMessage;
+                isListening = false; 
+                if (!simulationActive) { 
+                    updateListeningButtonUI(false);
+                }
+            };
+
+            recognition.onend = () => {
+                isListening = false; 
+                if (simulationActive && !isAIClientProcessing) { 
+                    console.log("Recognition ended unexpectedly, restarting for active simulation.");
+                    startListeningInternal(); 
+                } else if (!simulationActive) {
+                    updateListeningButtonUI(false);
+                    listeningStatusEl.textContent = langStrings[currentLanguage].listeningStatusNotListening;
+                }
+            };
+        } else { 
+            console.warn('Speech Recognition API not supported in this browser.');
+            if(toggleListeningBtn) toggleListeningBtn.disabled = true;
+            if(listeningStatusEl) listeningStatusEl.textContent = 'Speech recognition not supported.';
+        }
+
+
+        // --- Modal Functions ---
+        function showHipModal(titleKey) { 
+            hipModalTitleEl.textContent = langStrings[currentLanguage][titleKey] || langStrings.en[titleKey];
+            hipModalBodyEl.innerHTML = hospitalIndemnityPitchHTML[currentLanguage]; 
+            hipModalEl.classList.remove('hidden');
+        }
+        function hideHipModal() {
+            hipModalEl.classList.add('hidden');
+        }
+
+        function showOcciExamplesModal() { 
+            occiExamplesModalBodyEl.innerHTML = occiExamplesHTML[currentLanguage]; 
+            occiExamplesModalEl.classList.remove('hidden');
+            document.getElementById('occi-examples-modal-title').textContent = langStrings[currentLanguage].occiModalTitle;
+        }
+        function hideOcciExamplesModal() { 
+            occiExamplesModalEl.classList.add('hidden');
+        }
+        
+        async function triggerAIGradingAndShowModal() {
+            callGradingModalTitleEl.textContent = langStrings[currentLanguage].callGradingModalTitle;
+            if (evaluationDateInput) evaluationDateInput.valueAsDate = new Date();
+            
+            gradeResultsDisplayEl.classList.add('hidden');
+            gradingCriteriaDisplayContainerEl.innerHTML = '';
+            aiGradingStatusEl.textContent = langStrings[currentLanguage].aiGradingInProgress;
+            aiGradingStatusEl.classList.remove('hidden');
+            downloadGradePdfBtnEl.disabled = true;
+            callGradingModalEl.classList.remove('hidden');
+
+            if (simulationActive) { 
+                toggleListening(); 
+            }
+
+
+            try {
+                const aiScoresData = await getAIGradedScorecard(fullCallTranscript, scorecardCriteria);
+                if (aiScoresData && Array.isArray(aiScoresData) && aiScoresData.length === scorecardCriteria.length) {
+                    aiGeneratedScores = aiScoresData;
+                    displayAIGradedScores(aiScoresData);
+                    calculateAndDisplaySummaryGrade(aiScoresData);
+                    aiGradingStatusEl.classList.add('hidden');
+                    downloadGradePdfBtnEl.disabled = false;
+                } else {
+                     console.error("AI did not return the expected number/format of scores. Received:", aiScoresData);
+                    throw new Error("AI did not return valid scores or expected format.");
+                }
+            } catch (error) {
+                console.error("Error during AI grading:", error);
+                aiGradingStatusEl.textContent = langStrings[currentLanguage].aiGradingError + ` (${error.message})`;
+            }
+        }
+
+
+        function hideCallGradingModal() { callGradingModalEl.classList.add('hidden'); }
+
+        function displayAIGradedScores(scoredItems) {
+            gradingCriteriaDisplayContainerEl.innerHTML = ''; 
+            scoredItems.forEach((item) => { 
+                const div = document.createElement('div');
+                div.className = 'grading-criteria-item';
+                
+                const criterionTextDiv = document.createElement('div');
+                criterionTextDiv.className = 'criterion-text';
+                const criterionIndex = item.criterionNumber - 1;
+                if (criterionIndex >= 0 && criterionIndex < scorecardCriteria.length) {
+                    criterionTextDiv.textContent = `${item.criterionNumber}. ${scorecardCriteria[criterionIndex]}`;
+                } else {
+                    criterionTextDiv.textContent = `${item.criterionNumber}. Unknown Criterion`;
+                }
+                
+                const scoreDiv = document.createElement('div');
+                scoreDiv.innerHTML = `<strong>Score:</strong> <span class="ai-score">${item.score}/10</span>`;
+
+                const commentDiv = document.createElement('div');
+                commentDiv.className = 'ai-comment';
+                commentDiv.textContent = `Comment: ${item.comment || "No comment provided."}`;
+
+                div.appendChild(criterionTextDiv);
+                div.appendChild(scoreDiv);
+                div.appendChild(commentDiv);
+                gradingCriteriaDisplayContainerEl.appendChild(div);
+            });
+        }
+
+
+        // --- Notes Tab Function ---
+        function toggleNotes() { 
+            notesMinimized = !notesMinimized;
+            persistentNotesContainer.classList.toggle('minimized', notesMinimized);
+            minimizeNotesBtn.textContent = notesMinimized ? langStrings[currentLanguage].maximizeNotesBtn : langStrings[currentLanguage].minimizeNotesBtn;
+            if (sessionNotesTextarea) {
+                sessionNotesTextarea.style.display = notesMinimized ? 'none' : 'block';
+            }
+             if (fullCallTranscriptDisplayEl && persistentNotesContainer.querySelector('label[for="full-call-transcript-display"]')) {
+                fullCallTranscriptDisplayEl.style.display = notesMinimized ? 'none' : 'block';
+                persistentNotesContainer.querySelector('label[for="full-call-transcript-display"]').style.display = notesMinimized ? 'none' : 'block';
+            }
+        }
+
+        // --- Language Toggle Function ---
+        function toggleLanguage() {
+            currentLanguage = currentLanguage === 'en' ? 'es' : 'en';
+            if (recognition) {
+                const wasSimActive = simulationActive; 
+                if (wasSimActive) {
+                    toggleListening(); 
+                }
+                recognition.lang = currentLanguage === 'en' ? 'en-US' : 'es-ES';
+            }
+            updateUIText();
+            loadSection(currentSectionIndex); 
+        }
+
+        function updateUIText() {
+            const lang = langStrings[currentLanguage];
+            languageToggleBtn.textContent = currentLanguage === 'en' ? lang.switchToSpanishBtn : lang.switchToEnglishBtn;
+            mainTitleEl.textContent = lang.mainTitle;
+            sectionTimeLabelEl.textContent = lang.sectionTimeLabel;
+            currentSectionLabelEl.textContent = lang.currentSectionLabel;
+            totalCallTimeLabelEl.textContent = lang.totalCallTimeLabel;
+            prevBtn.textContent = lang.prevBtn;
+            nextBtn.textContent = lang.nextBtn;
+            startOverBtn.textContent = lang.startOverBtn;
+            sessionNotesTitleEl.textContent = lang.sessionNotesTitle;
+            minimizeNotesBtn.textContent = notesMinimized ? lang.maximizeNotesBtn : lang.minimizeNotesBtn;
+            
+            updateListeningButtonUI(simulationActive); 
+            
+            if (listeningStatusEl) {
+                if (simulationActive) {
+                    if (isAIClientProcessing) {
+                        listeningStatusEl.textContent = lang.listeningStatusAwaitingClient;
+                    } else if (isListening) {
+                         listeningStatusEl.textContent = lang.listeningStatusListening;
+                    } else {
+                        if (!listeningStatusEl.textContent.includes("Error") && !listeningStatusEl.textContent.includes("denied")) {
+                             listeningStatusEl.textContent = lang.listeningStatusListening;
+                        }
+                    }
+                } else {
+                    listeningStatusEl.textContent = lang.listeningStatusNotListening;
+                }
+            }
+
+
+            if (transcribedTextDisplayEl && (transcribedTextDisplayEl.textContent === langStrings.en.transcribedTextWaiting || transcribedTextDisplayEl.textContent === langStrings.es.transcribedTextWaiting) ) {
+                 transcribedTextDisplayEl.textContent = lang.transcribedTextWaiting;
+            }
+             if (aiClientResponseDisplayEl && (aiClientResponseDisplayEl.textContent === langStrings.en.aiClientResponseWaiting || aiClientResponseDisplayEl.textContent === langStrings.es.aiClientResponseWaiting) ) { 
+                aiClientResponseDisplayEl.textContent = lang.aiClientResponseWaiting;
+            }
+            
+            if (callGradingModalTitleEl) callGradingModalTitleEl.textContent = lang.callGradingModalTitle;
+            if (downloadGradePdfBtnEl) downloadGradePdfBtnEl.textContent = lang.downloadPDFBtn;
+            if (document.querySelector('label[for="evaluator-name"]')) document.querySelector('label[for="evaluator-name"]').textContent = lang.evaluatorNameLabel;
+            if (document.querySelector('label[for="agent-name-grade"]')) document.querySelector('label[for="agent-name-grade"]').textContent = lang.agentNameLabel;
+            if (document.querySelector('label[for="evaluation-date"]')) document.querySelector('label[for="evaluation-date"]').textContent = lang.dateLabel;
+            if (aiGradingStatusEl && (aiGradingStatusEl.textContent === langStrings.en.aiGradingInProgress || aiGradingStatusEl.textContent === langStrings.es.aiGradingInProgress) && !aiGradingStatusEl.classList.contains('hidden')) {
+                aiGradingStatusEl.textContent = lang.aiGradingInProgress;
+            }
+            
+            const gradeResultsH4 = gradeResultsDisplayEl.querySelector('h4');
+            if (gradeResultsH4) gradeResultsH4.textContent = lang.callGradingModalTitle; 
+            const totalScoreLabelEl = gradeResultsDisplayEl.querySelector('p:nth-child(2) strong');
+            if (totalScoreLabelEl) totalScoreLabelEl.textContent = lang.totalScoreLabel;
+            const percentageLabelEl = gradeResultsDisplayEl.querySelector('p:nth-child(3) strong');
+            if (percentageLabelEl) percentageLabelEl.textContent = lang.percentageLabel;
+            const statusLabelEl = gradeResultsDisplayEl.querySelector('p:nth-child(4) strong');
+            if (statusLabelEl) statusLabelEl.textContent = lang.statusLabel;
+            const overallGradeLabelEl = gradeResultsDisplayEl.querySelector('p:nth-child(5) strong');
+            if (overallGradeLabelEl) overallGradeLabelEl.textContent = lang.overallGradeLabel;
+
+            const interactionPanelTitleEl = interactionPanelEl.querySelector('h4#ai-client-panel-title');
+            if (interactionPanelTitleEl) {
+                interactionPanelTitleEl.textContent = lang.aiClientPanelTitle;
+            }
+            const conversationLogTitleEl = interactionPanelEl.querySelector('h4.text-xs');
+             if (conversationLogTitleEl) {
+                conversationLogTitleEl.textContent = lang.conversationLogTitle;
+            }
+
+
+            if (bodyEl && currentLanguage === 'es') { 
+                bodyEl.classList.add('lang-es');
+            } else if (bodyEl) { 
+                bodyEl.classList.remove('lang-es');
+            }
+        }
+
+
+        // --- Timer Functions ---
+        function formatTime(totalSeconds) {
+            const isNegative = totalSeconds < 0;
+            if (isNegative) totalSeconds = Math.abs(totalSeconds);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            const sign = isNegative ? "-" : "";
+            return `${sign}${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function startTotalTimer() {
+            stopTotalTimer();
+            totalSecondsElapsed = 0;
+            totalTimerEl.textContent = formatTime(totalSecondsElapsed);
+            totalIntervalId = setInterval(() => {
+                totalSecondsElapsed++;
+                totalTimerEl.textContent = formatTime(totalSecondsElapsed);
+            }, 1000);
+        }
+
+        function stopTotalTimer() {
+             if (totalIntervalId) {
+                 clearInterval(totalIntervalId);
+                 totalIntervalId = null;
+             }
+        }
+
+        function startSectionTimer() {
+            stopSectionTimer();
+            const currentSection = scriptSections[currentSectionIndex];
+            const duration = typeof currentSection.durationMinutes === 'number' ? currentSection.durationMinutes : 0;
+            targetSectionSeconds = duration * 60;
+            sectionSecondsRemaining = targetSectionSeconds;
+            updateSectionTimerDisplay();
+
+            sectionIntervalId = setInterval(() => {
+                sectionSecondsRemaining--;
+                updateSectionTimerDisplay();
+            }, 1000);
+        }
+
+        function updateSectionTimerDisplay() {
+            sectionTimerEl.textContent = formatTime(sectionSecondsRemaining);
+            sectionTimerEl.classList.remove('timer-normal', 'timer-warning', 'timer-over');
+
+            if (sectionSecondsRemaining < 0) {
+                sectionTimerEl.classList.add('timer-over');
+                if (bodyEl) bodyEl.classList.add('flash-red-bg');
+            } else {
+                 if (bodyEl) bodyEl.classList.remove('flash-red-bg');
+                if (sectionSecondsRemaining <= 60 && targetSectionSeconds > 0) { 
+                    sectionTimerEl.classList.add('timer-warning');
+                } else {
+                    sectionTimerEl.classList.add('timer-normal');
+                }
+            }
+        }
+
+        function stopSectionTimer() {
+            if (sectionIntervalId) {
+                clearInterval(sectionIntervalId);
+                sectionIntervalId = null;
+            }
+             if (bodyEl) bodyEl.classList.remove('flash-red-bg');
+        }
+
+        // --- Navigation & Display Functions ---
+        function loadSection(index) {
+            if (index < 0 || index >= scriptSections.length) return;
+            stopSectionTimer();
+            currentSectionIndex = index;
+            const section = scriptSections[currentSectionIndex];
+            sectionTitleEl.textContent = section.title[currentLanguage]; 
+            scriptContentEl.innerHTML = section.content[currentLanguage]; 
+            scriptContentEl.scrollTop = 0; 
+            removePreviousHighlights(); 
+
+            const duration = typeof section.durationMinutes === 'number' ? section.durationMinutes : 0;
+            sectionTargetTimeEl.textContent = `Target: ${duration} min`; 
+
+            prevBtn.disabled = currentSectionIndex === 0;
+            nextBtn.disabled = currentSectionIndex === scriptSections.length - 1;
+
+            attachDynamicButtonListeners();
+            startSectionTimer();
+            aiClientResponseDisplayEl.textContent = langStrings[currentLanguage].aiClientResponseWaiting;
+            const interactionPanelTitleEl = interactionPanelEl.querySelector('h4#ai-client-panel-title'); 
+            if (interactionPanelTitleEl) {
+                interactionPanelTitleEl.textContent = langStrings[currentLanguage].aiClientPanelTitle;
+            }
+            transcribedTextDisplayEl.textContent = langStrings[currentLanguage].transcribedTextWaiting;
+        }
+
+        function attachDynamicButtonListeners() {
+            const section = scriptSections[currentSectionIndex];
+            const lang = langStrings[currentLanguage];
+
+            if (section.title.en === "ELIGIBILITY STATUS") { 
+                const notEligibleBtn = document.getElementById('not-medicare-eligible-btn');
+                if(notEligibleBtn) notEligibleBtn.textContent = lang.notMedicareEligibleBtn;
+                notEligibleBtn?.addEventListener('click', () => {
+                    showHipModal("hipModalTitle");
+                });
+                
+                const marxBtn = document.getElementById('marx-portal-btn');
+                if(marxBtn) marxBtn.textContent = lang.marxPortalBtn;
+                marxBtn?.addEventListener('click', () => {
+                    window.open('https://portal.cms.gov/portal/', '_blank');
+                });
+            } else if (section.title.en === "NEEDS ANALYSIS") {
+                const occiBtn = document.getElementById('occi-examples-btn');
+                if(occiBtn) occiBtn.textContent = lang.occiExamplesBtn;
+                occiBtn?.addEventListener('click', showOcciExamplesModal); 
+                
+                document.getElementById('uhc-provider-btn')?.addEventListener('click', () => { window.open('https://connect.werally.com/county-plan-selection/uhc.mnr/zip', '_blank'); });
+                document.getElementById('aetna-provider-btn')?.addEventListener('click', () => { window.open('https://www.aetna.com/medicare/find-provider.html?&redirect=akamai', '_blank'); });
+                document.getElementById('humana-provider-btn')?.addEventListener('click', () => { window.open('https://finder.humana.com/finder/medical?customerId=1', '_blank'); });
+                document.getElementById('careplus-provider-btn')?.addEventListener('click', () => { window.open('https://www.careplushealthplans.com/members/member-resources/provider-directories', '_blank'); });
+                document.getElementById('wellcare-provider-btn')?.addEventListener('click', () => { window.open('https://www.wellcarefindaprovider.com/', '_blank'); });
+                
+                document.getElementById('uhc-rx-btn')?.addEventListener('click', () => { window.open('https://www.uhc.com/medicare/shop/prescription-drug-plans.html', '_blank'); });
+                document.getElementById('aetna-rx-btn')?.addEventListener('click', () => { window.open('https://www.aetnamedicare.com/en/prescription-drugs/check-medicare-drug-list.html', '_blank'); });
+                document.getElementById('humana-rx-btn')?.addEventListener('click', () => { window.open('https://www.humana.com/pharmacy/prescription-coverages/medicare-drug-list', '_blank'); });
+                document.getElementById('careplus-rx-btn')?.addEventListener('click', () => { window.open('https://www.careplushealthplans.com/medicare/medicare-advantage-plans/prescription-drugs-list', '_blank'); });
+                document.getElementById('wellcare-rx-btn')?.addEventListener('click', () => { window.open('https://www.wellcare.com/medicare', '_blank'); });
+
+            } else if (section.title.en === "CLOSE") {
+                const noSepIdentifiedBtn = document.getElementById('no-sep-identified-btn');
+                if (noSepIdentifiedBtn) {
+                    noSepIdentifiedBtn.textContent = lang.noSepIdentifiedBtn; 
+                    noSepIdentifiedBtn.addEventListener('click', () => {
+                        showHipModal(lang.hipModalTitle + " (No SEP)");
+                        const benefitsSummaryEl = document.getElementById('required-benefits-summary');
+                        if(benefitsSummaryEl) benefitsSummaryEl.classList.add('hidden'); 
+                    });
+                }
+                const sepCheckContainer = document.getElementById('sep-check-container');
+                if (sepCheckContainer) {
+                    const sepIdBtn = document.getElementById('sep-identified-btn');
+                    if(sepIdBtn) sepIdBtn.textContent = lang.sepIdentifiedBtn;
+                    sepIdBtn?.addEventListener('click', handleSepIdentifiedClick);
+
+                    const sepFindBtn = document.getElementById('sep-finder-btn');
+                    if(sepFindBtn) sepFindBtn.textContent = lang.sepFinderBtn;
+                    sepFindBtn?.addEventListener('click', handleSepFinderClick); 
+
+                    const spapFindBtn = document.getElementById('spap-finder-btn');
+                    if(spapFindBtn) spapFindBtn.textContent = lang.spapFinderBtn;
+                    spapFindBtn?.addEventListener('click', handleSpapFinderClick); 
+                }
+            } else if (section.title.en === "POST-APP & WRAP UP") { 
+                const mapdBtn = document.getElementById('mapd-sales-form-btn');
+                if(mapdBtn) mapdBtn.textContent = lang.mapdSalesFormBtn;
+                mapdBtn?.addEventListener('click', () => {
+                    window.open('https://go.buildingbetterinsurance.com/widget/form/eI88f2nrhsrN7nBDqSbJ', '_blank');
+                });
+                const ancillaryBtn = document.getElementById('ancillary-sales-form-btn');
+                if(ancillaryBtn) ancillaryBtn.textContent = lang.ancillarySalesFormBtn;
+                ancillaryBtn?.addEventListener('click', () => {
+                    window.open('https://go.buildingbetterinsurance.com/widget/form/XiagteIQHwQ0U88LfWUf', '_blank');
+                });
+                const endCallGradeBtn = document.getElementById('end-call-grade-btn');
+                if (endCallGradeBtn) {
+                    endCallGradeBtn.textContent = lang.endCallGradeBtn;
+                    endCallGradeBtn.addEventListener('click', triggerAIGradingAndShowModal);
+                }
+            }
+        }
+
+
+        function handleSepIdentifiedClick() {
+            const benefitsSummaryEl = document.getElementById('required-benefits-summary');
+            if(benefitsSummaryEl) benefitsSummaryEl.classList.remove('hidden');
+        }
+
+        function handleSepFinderClick() {
+            window.open('https://gemini.google.com/share/7fdd5b657fc4', '_blank');
+        }
+        
+        function handleSpapFinderClick() { 
+            window.open('https://g.co/gemini/share/23435f44eccc', '_blank');
+        }
+
+
+        function nextSection() {
+            if (currentSectionIndex < scriptSections.length - 1) {
+                loadSection(currentSectionIndex + 1);
+            }
+        }
+        function prevSection() {
+            if (currentSectionIndex > 0) {
+                loadSection(currentSectionIndex - 1);
+            }
+        }
+        function startOver() {
+            if (simulationActive) {
+                toggleListening(); 
+            }
+            stopSectionTimer();
+            stopTotalTimer();
+            if(sessionNotesTextarea) sessionNotesTextarea.value = ""; 
+            fullCallTranscript = ""; 
+            if(fullCallTranscriptDisplayEl) fullCallTranscriptDisplayEl.value = "";
+            conversationHistory = [];
+            updateConversationLogDisplay();
+            currentLanguage = 'en'; 
+            updateUIText(); 
+            loadSection(0);
+            startTotalTimer();
+            removePreviousHighlights();
+        }
+
+        // --- AI Training & Client Simulation Functions ---
+        function updateListeningButtonUI(isSimActive) {
+            const lang = langStrings[currentLanguage];
+            if (isSimActive) {
+                toggleListeningBtn.textContent = lang.stopListeningBtn;
+                toggleListeningBtn.classList.remove('bg-green-500', 'hover:bg-green-600');
+                toggleListeningBtn.classList.add('bg-red-500', 'hover:bg-red-600');
+            } else {
+                toggleListeningBtn.textContent = lang.startListeningBtn;
+                toggleListeningBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
+                toggleListeningBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+                listeningStatusEl.textContent = lang.listeningStatusNotListening;
+            }
+        }
+
+        function toggleListening() {
+            if (!SpeechRecognition) {
+                 alert("Sorry, your browser doesn't support speech recognition. Try using Chrome or Edge.");
+                return;
+            }
+            simulationActive = !simulationActive; 
+            updateListeningButtonUI(simulationActive);
+
+            if (simulationActive) {
+                generateMockClientProfile(); 
+                conversationHistory = []; 
+                updateConversationLogDisplay();
+                fullCallTranscript = ""; 
+                if(fullCallTranscriptDisplayEl) fullCallTranscriptDisplayEl.value = "";
+                aiClientResponseDisplayEl.textContent = langStrings[currentLanguage].aiClientResponseWaiting; 
+                startListeningInternal(); 
+            } else {
+                if (recognition && isListening) {
+                    recognition.stop(); 
+                }
+                isListening = false; 
+                isAIClientProcessing = false; 
+                if (typeof responsiveVoice !== 'undefined') { 
+                    responsiveVoice.cancel();
+                } else if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel(); 
+                }
+            }
+        }
+        
+        async function startListeningInternal() { 
+            if (recognition && !isListening) {
+                try {
+                    await navigator.mediaDevices.getUserMedia({ audio: true });
+                    
+                    transcribedTextDisplayEl.textContent = langStrings[currentLanguage].transcribedTextWaiting;
+                    recognition.lang = currentLanguage === 'en' ? 'en-US' : 'es-ES';
+                    recognition.start();
+                    isListening = true;
+                } catch (err) { 
+                    console.error("Error starting recognition (internal):", err);
+                     if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                        listeningStatusEl.textContent = langStrings[currentLanguage].listeningStatusPermissionDenied;
+                    } else {
+                        listeningStatusEl.textContent = langStrings[currentLanguage].listeningStatusError + ` (${err.name})`;
+                    }
+                    isListening = false;
+                    simulationActive = false; 
+                    updateListeningButtonUI(false);
+                }
+            }
+        }
+
+
+        function extractAgentScriptLines() { 
+            const currentScriptHTML = scriptSections[currentSectionIndex].content[currentLanguage];
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(currentScriptHTML, 'text/html');
+            const agentLines = [];
+            doc.querySelectorAll('.agent-line, .verbatim').forEach(line => { 
+                const clone = line.cloneNode(true);
+                let text = "";
+                clone.childNodes.forEach(child => {
+                    if (child.nodeType === Node.TEXT_NODE) {
+                        text += child.textContent.trim();
+                    } else if (child.nodeType === Node.ELEMENT_NODE && child.tagName !== 'SPAN') { 
+                         text += child.textContent.trim();
+                    } else if (child.nodeType === Node.ELEMENT_NODE && child.classList.contains('yellow-highlight-note')) {
+                        text += " " + child.textContent.trim(); 
+                    }
+                });
+                agentLines.push(text.replace(/^Agent:\s*/i, '').replace(/^Agente:\s*/i, '').trim());
+            });
+            return agentLines.join(' ').trim(); 
+        }
+        function removePreviousHighlights() { 
+             const existingHighlights = scriptContentEl.querySelectorAll('span.flash-highlight');
+            existingHighlights.forEach(span => {
+                const parent = span.parentNode;
+                if (parent) {
+                    while (span.firstChild) {
+                        parent.insertBefore(span.firstChild, span);
+                    }
+                    parent.removeChild(span);
+                    parent.normalize(); 
+                }
+            });
+        }
+        function highlightTextInScript(searchText) { /* ... same ... */ }
+        
+        function speakText(text) {
+            const lang = currentLanguage;
+            const voice = lang === 'es' ? 'Spanish Female' : 'US English Female';
+            
+            const speakOptions = {
+                rate: 0.95,
+                pitch: 1.0,
+                onstart: () => {
+                    console.log("ResponsiveVoice started speaking.");
+                },
+                onend: () => {
+                    console.log("ResponsiveVoice finished speaking.");
+                    isAIClientProcessing = false; 
+                    if(simulationActive){
+                        listeningStatusEl.textContent = langStrings[lang].listeningStatusListening; 
+                         if (!isListening) { 
+                            startListeningInternal();
+                        }
+                    }
+                },
+                onerror: (err) => {
+                    console.error("ResponsiveVoice error:", err);
+                    isAIClientProcessing = false; 
+                     if(simulationActive){
+                        listeningStatusEl.textContent = langStrings[lang].listeningStatusListening; 
+                         if (!isListening) {
+                            startListeningInternal();
+                        }
+                    }
+                }
+            };
+
+            if (typeof responsiveVoice !== 'undefined' && responsiveVoice.speak) {
+                responsiveVoice.cancel(); 
+                responsiveVoice.speak(text, voice, speakOptions);
+            } else {
+                console.warn("ResponsiveVoice not available, falling back to browser synthesis (if available).");
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = lang === 'es' ? 'es-ES' : 'en-US';
+                    utterance.rate = 0.95;
+                    utterance.pitch = 1.0;
+                    const voices = window.speechSynthesis.getVoices();
+                    let selectedVoice = voices.find(v => v.lang === utterance.lang && v.name.includes('Female'));
+                     if (!selectedVoice) selectedVoice = voices.find(v => v.lang.startsWith(lang) || v.default);
+                    utterance.voice = selectedVoice || voices[0];
+
+                    utterance.onend = speakOptions.onend; 
+                    utterance.onerror = speakOptions.onerror; 
+                    window.speechSynthesis.speak(utterance);
+                } else {
+                     console.error("Speech synthesis not supported in this browser.");
+                     speakOptions.onerror("Speech synthesis not supported"); 
+                }
+            }
+        }
+
+
+        function addToConversationLog(role, text) { 
+            conversationHistory.push({ role, text });
+            if (conversationHistory.length > MAX_CONVERSATION_LOG * 2) { 
+                conversationHistory = conversationHistory.slice(-MAX_CONVERSATION_LOG * 2);
+            }
+            updateConversationLogDisplay();
+        }
+        function updateConversationLogDisplay() { 
+            conversationLogDisplayEl.innerHTML = '';
+            const startIndex = Math.max(0, conversationHistory.length - MAX_CONVERSATION_LOG);
+            for (let i = startIndex; i < conversationHistory.length; i++) {
+                const turn = conversationHistory[i];
+                const p = document.createElement('p');
+                p.innerHTML = `<span class="${turn.role === 'agent' ? 'conversation-log-agent' : 'conversation-log-client'}">${turn.role.charAt(0).toUpperCase() + turn.role.slice(1)}:</span> ${turn.text}`;
+                conversationLogDisplayEl.appendChild(p);
+            }
+            conversationLogDisplayEl.scrollTop = conversationLogDisplayEl.scrollHeight;
+        }
+        function getConversationHistoryForPrompt() { 
+            return conversationHistory.slice(-6) 
+                .map(turn => `${turn.role.charAt(0).toUpperCase() + turn.role.slice(1)}: ${turn.text}`)
+                .join("\n");
+        }
+
+        async function getAIClientResponse(agentUtterance) {
+            aiClientResponseDisplayEl.textContent = langStrings[currentLanguage].aiClientResponseLoading;
+            const conversationContext = getConversationHistoryForPrompt();
+            const currentScriptContext = extractAgentScriptLines(); 
+
+            const prompt = `You are role-playing as a potential client named ${mockClientProfile.name}.
+Your persona: You live in ${mockClientProfile.state} (zip code ${mockClientProfile.zipCode}). You are primarily interested in getting a ${mockClientProfile.interest}.
+You are on the phone with a Medicare insurance agent.
+The agent is likely trying to cover the following script points in this part of the conversation:
+--- AGENT'S CURRENT SCRIPT SECTION CONTEXT ---
+${currentScriptContext}
+--- END SCRIPT CONTEXT ---
+
+Your role is to respond naturally as this client.
+- Only provide your zip code (${mockClientProfile.zipCode}) if the agent specifically asks for it.
+- Only mention your interest in a ${mockClientProfile.interest} if the agent asks about what benefits you are looking for.
+- Otherwise, react to what the agent says. Be generally agreeable and cooperative.
+- You can ask 1-2 simple clarifying questions if the agent says something complex.
+- You can express 1-2 mild, common concerns during the entire call (e.g., "Is this going to cost me more?", "Will I have to change my doctor?", "That sounds a bit complicated.").
+- Avoid strong or frequent objections. Let the agent guide the conversation.
+- You do NOT know the agent's script. Respond as if you are hearing this information for the first time.
+- Keep your responses concise (1-3 sentences). Do not use markdown.
+
+Conversation History (last few turns):
+${conversationContext}
+
+Agent just said: "${agentUtterance}"
+
+${mockClientProfile.name} (Client) responds:`;
+
+            let chat = [{ role: "user", parts: [{ text: prompt }] }];
+            const payload = { contents: chat };
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
+                const result = await response.json();
+
+                if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
+                    const clientResponseText = result.candidates[0].content.parts[0].text.trim();
+                    aiClientResponseDisplayEl.textContent = clientResponseText;
+                    addToConversationLog("client", clientResponseText);
+                    speakText(clientResponseText); 
+                } else {
+                    throw new Error("Malformed AI client response");
+                }
+            } catch (error) {
+                console.error('Error getting AI client response:', error);
+                aiClientResponseDisplayEl.textContent = langStrings[currentLanguage].aiClientResponseError + ` (${error.message})`;
+                isAIClientProcessing = false; 
+                if (simulationActive && !isListening) { 
+                   startListeningInternal();
+                } else if (simulationActive) {
+                    listeningStatusEl.textContent = langStrings[currentLanguage].listeningStatusListening; 
+                }
+            }
+        }
+
+        async function getAIGradedScorecard(fullTranscript, criteria) { 
+            const criteriaText = criteria.map((c, i) => `${i+1}. ${c}`).join("\n");
+            const prompt = `You are an expert call quality analyst.
+The agent was supposed to follow a sales script.
+Here is the full transcript of what the agent said during the call:
+--- AGENT'S FULL TRANSCRIPT ---
+${fullTranscript || "No speech was recorded for the full call."}
+--- END AGENT'S FULL TRANSCRIPT ---
+
+Please evaluate the agent's performance based on the following 10 criteria. For each criterion, provide a score from 1 (Poor) to 10 (Excellent).
+Your response MUST be a JSON array of objects, where each object has a "criterionNumber" (integer from 1 to 10), a "score" (integer from 1 to 10), and a brief "comment" (string, 1-2 sentences explaining the score).
+
+Scorecard Criteria to evaluate:
+${criteriaText}
+
+Provide only the JSON array as your response. Ensure the JSON is valid.
+Example of a single item in the JSON array:
+{ "criterionNumber": 1, "score": 8, "comment": "Agent clearly stated their name and company, but didn't explicitly say 'licensed agent'." }
+`;
+
+            let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+            const payload = { 
+                contents: chatHistory,
+                generationConfig: { 
+                    responseMimeType: "application/json",
+                }
+            };
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.text();
+                console.error("AI Grading API Error Response Body:", errorBody);
+                throw new Error(`AI Grading API request failed with status ${response.status}`);
+            }
+            const result = await response.json();
+
+            if (result.candidates && result.candidates.length > 0 &&
+                result.candidates[0].content && result.candidates[0].content.parts &&
+                result.candidates[0].content.parts.length > 0) {
+                const rawJsonText = result.candidates[0].content.parts[0].text;
+                try {
+                    const parsedScores = JSON.parse(rawJsonText);
+                    if (Array.isArray(parsedScores) && parsedScores.every(item => 
+                        typeof item.criterionNumber === 'number' &&
+                        typeof item.score === 'number' &&
+                        typeof item.comment === 'string'
+                    )) {
+                        return parsedScores;
+                    } else {
+                        console.error("Parsed AI scores are not in the expected format:", parsedScores);
+                        throw new Error("AI returned scores in an unexpected format.");
+                    }
+                } catch (e) {
+                    console.error("Error parsing AI scores JSON:", e, "Raw text:", rawJsonText);
+                    throw new Error("Could not parse AI scores from response.");
+                }
+            } else {
+                console.error("Unexpected API response structure for AI grading:", result);
+                throw new Error("Malformed response from AI grading service.");
+            }
+        }
+
+        function calculateAndDisplaySummaryGrade(scoredItems) { 
+            let totalScore = 0;
+            if (!Array.isArray(scoredItems) || scoredItems.length === 0) {
+                console.error("Cannot calculate grade: No scored items provided or invalid format.");
+                totalScoreDisplayEl.textContent = "N/A";
+                percentageDisplayEl.textContent = "N/A";
+                passFailStatusDisplayEl.textContent = "N/A";
+                overallGradeDisplayEl.textContent = "N/A";
+                gradeResultsDisplayEl.classList.remove('hidden');
+                downloadGradePdfBtnEl.disabled = true;
+                return;
+            }
+
+            scoredItems.forEach(item => {
+                totalScore += (item.score || 0); 
+            });
+
+            const percentage = (totalScore / (scorecardCriteria.length * 10)) * 100;
+            const pass = percentage >= 70;
+            let overallGrade = "";
+
+            if (percentage >= 90) overallGrade = "Excellent";
+            else if (percentage >= 80) overallGrade = "Very Good";
+            else if (percentage >= 70) overallGrade = "Good";
+            else if (percentage >= 60) overallGrade = "Fair";
+            else overallGrade = "Needs Improvement";
+
+            totalScoreDisplayEl.textContent = totalScore;
+            percentageDisplayEl.textContent = percentage.toFixed(1);
+            passFailStatusDisplayEl.textContent = pass ? langStrings[currentLanguage].passStatus : langStrings[currentLanguage].failStatus;
+            passFailStatusDisplayEl.className = pass ? 'pass' : 'fail';
+            overallGradeDisplayEl.textContent = overallGrade;
+
+            gradeResultsDisplayEl.classList.remove('hidden');
+            downloadGradePdfBtnEl.disabled = false; 
+        }
+
+        function generateGradePDF() { 
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            const agName = agentNameGradeInput.value || "N/A"; 
+            const evalDate = evaluationDateInput.value ? new Date(evaluationDateInput.value).toLocaleDateString() : new Date().toLocaleDateString();
+
+            let yPos = 20;
+            const lineHeight = 7;
+            const commentLineHeight = 5;
+            const margin = 15;
+            const pageWidth = doc.internal.pageSize.getWidth();
+
+            doc.setFontSize(18);
+            doc.text("AI Call Scorecard Report", pageWidth / 2, yPos, { align: 'center' });
+            yPos += lineHeight * 2;
+
+            doc.setFontSize(11);
+            doc.text(`Evaluator: AI Assistant`, margin, yPos);
+            yPos += lineHeight;
+            doc.text(`Agent: ${agName}`, margin, yPos);
+            yPos += lineHeight;
+            doc.text(`Date: ${evalDate}`, margin, yPos);
+            yPos += lineHeight * 2;
+
+            doc.setFontSize(12);
+            doc.text("Scoring Criteria & AI Feedback:", margin, yPos);
+            yPos += lineHeight;
+            
+            aiGeneratedScores.forEach((item) => {
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'bold');
+                const criterionIndex = item.criterionNumber - 1;
+                const criterionText = (criterionIndex >=0 && criterionIndex < scorecardCriteria.length) ? 
+                                      `${item.criterionNumber}. ${scorecardCriteria[criterionIndex]}` : 
+                                      `${item.criterionNumber}. Unknown Criterion`;
+
+                let splitCriterion = doc.splitTextToSize(criterionText, pageWidth - margin * 2 - 25); 
+                doc.text(splitCriterion, margin, yPos);
+                doc.text((item.score || "N/A").toString() + "/10", pageWidth - margin - 15, yPos, {align: 'right'});
+                yPos += (splitCriterion.length * (lineHeight -2)) + 2;
+
+                doc.setFont(undefined, 'italic');
+                doc.setFontSize(9);
+                const commentText = `Comment: ${item.comment || "No comment."}`;
+                let splitComment = doc.splitTextToSize(commentText, pageWidth - margin * 2 - 5); 
+                doc.text(splitComment, margin + 5, yPos);
+                yPos += (splitComment.length * commentLineHeight) + 3; 
+                
+                if (yPos > doc.internal.pageSize.getHeight() - 40) { 
+                    doc.addPage();
+                    yPos = 20;
+                }
+                doc.setFont(undefined, 'normal'); 
+            });
+            
+            yPos += lineHeight; 
+            if (yPos > doc.internal.pageSize.getHeight() - 40) { 
+                doc.addPage();
+                yPos = 20;
+            }
+
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text("Call Grade Summary:", margin, yPos);
+            yPos += lineHeight;
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Total Score: ${totalScoreDisplayEl.textContent} / ${scorecardCriteria.length * 10}`, margin, yPos);
+            yPos += lineHeight;
+            doc.text(`Percentage: ${percentageDisplayEl.textContent}%`, margin, yPos);
+            yPos += lineHeight;
+            doc.text(`Status: ${passFailStatusDisplayEl.textContent}`, margin, yPos);
+            yPos += lineHeight;
+            doc.text(`Overall Grade: ${overallGradeDisplayEl.textContent}`, margin, yPos);
+            
+            yPos += lineHeight * 2;
+            if (yPos > doc.internal.pageSize.getHeight() - 20) { 
+                doc.addPage();
+                yPos = 20;
+            }
+            doc.setFontSize(8);
+            doc.text("Full Call Transcript:", margin, yPos);
+            yPos += lineHeight - 2;
+            doc.setFontSize(6);
+            const transcriptLines = doc.splitTextToSize(fullCallTranscript || "No transcript available.", pageWidth - margin * 2);
+            doc.text(transcriptLines, margin, yPos);
+
+
+            doc.save(`AI_Call_Score_Report_${agName.replace(/\s+/g, '_') || 'Agent'}_${evalDate.replace(/\//g, '-')}.pdf`);
+        }
+
+
+        // --- Event Listeners ---
+        prevBtn.addEventListener('click', prevSection);
+        nextBtn.addEventListener('click', nextSection);
+        startOverBtn.addEventListener('click', startOver);
+        languageToggleBtn.addEventListener('click', toggleLanguage); 
+        hipModalCloseBtnEl.addEventListener('click', hideHipModal);
+        hipModalEl.addEventListener('click', (event) => { 
+            if (event.target === hipModalEl) hideHipModal();
+        });
+        occiExamplesModalCloseBtnEl.addEventListener('click', hideOcciExamplesModal);
+        occiExamplesModalEl.addEventListener('click', (event) => { 
+            if (event.target === occiExamplesModalEl) hideOcciExamplesModal();
+        });
+        minimizeNotesBtn.addEventListener('click', toggleNotes); 
+        if (toggleListeningBtn) {
+            toggleListeningBtn.addEventListener('click', toggleListening);
+        }
+        callGradingModalCloseBtnEl.addEventListener('click', hideCallGradingModal);
+        callGradingModalEl.addEventListener('click', (event) => {
+            if (event.target === callGradingModalEl) hideCallGradingModal();
+        });
+        downloadGradePdfBtnEl.addEventListener('click', generateGradePDF);
+
+        // --- Initialization ---
+        updateUIText(); 
+        loadSection(0);
+        startTotalTimer();
+        if (sessionNotesTextarea) { 
+             sessionNotesTextarea.style.display = notesMinimized ? 'none' : 'block';
+        }
+        if (fullCallTranscriptDisplayEl) { 
+            fullCallTranscriptDisplayEl.value = "";
+        }
+        if ('speechSynthesis' in window && window.speechSynthesis.onvoiceschanged !== undefined) {
+            window.speechSynthesis.onvoiceschanged = () => { /* Voices loaded */ };
+        }
+    </script>
+
+</body>
+</html>
